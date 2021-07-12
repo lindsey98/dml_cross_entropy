@@ -45,7 +45,7 @@ def cars():
     data_path = 'data/CARS_196'
     resize = (256, 256)
     color_jitter = (0.3, 0.3, 0.3, 0.1)
-    ratio = (1, 1)
+    ratio = (1., 1.)
 
 
 @data_ingredient.named_config
