@@ -32,7 +32,6 @@ def train(model: nn.Module,
 
     pbar = tqdm(loader, ncols=80, desc='Training   [{:03d}]'.format(epoch))
     for i, (batch, labels, indices) in enumerate(pbar):
-#         print(type(batch), type(labels), type(indices))
         batch, labels, indices = map(to_device, (batch, labels, indices))
         logits, features = model(batch)
         loss = class_loss(logits, labels).mean()
