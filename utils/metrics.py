@@ -199,6 +199,7 @@ def recall_at_ks_full(query_features: torch.Tensor,
     return recalls, precisions
 
 
+
 @torch.no_grad()
 def fp_fn_eval(query_features: torch.Tensor,
                  query_labels: torch.LongTensor,
@@ -209,29 +210,28 @@ def fp_fn_eval(query_features: torch.Tensor,
                  threshold: Optional[float] = None) -> Dict[int, float]:
     """
     Get FPs and FNs from query data
+        Parameters
+        ----------
+        query_features : torch.Tensor
+            Features for each query sample. shape: (num_queries, num_features)
+        query_labels : torch.LongTensor
+            Labels corresponding to the query features. shape: (num_queries,)
+        ks : List[int]
+            Values at which to compute the recall.
+        gallery_features : torch.Tensor
+            Features for each gallery sample. shape: (num_queries, num_features)
+        gallery_labels : torch.LongTensor
+            Labels corresponding to the gallery features. shape: (num_queries,)
+        cosine : bool
+            Use cosine distance between samples instead of euclidean distance.
+        threshold: float
+            Use to thresholding on the matched similarity, only consider cosine distance thresholding for now
 
-    Parameters
-    ----------
-    query_features : torch.Tensor
-        Features for each query sample. shape: (num_queries, num_features)
-    query_labels : torch.LongTensor
-        Labels corresponding to the query features. shape: (num_queries,)
-    ks : List[int]
-        Values at which to compute the recall.
-    gallery_features : torch.Tensor
-        Features for each gallery sample. shape: (num_queries, num_features)
-    gallery_labels : torch.LongTensor
-        Labels corresponding to the gallery features. shape: (num_queries,)
-    cosine : bool
-        Use cosine distance between samples instead of euclidean distance.
-    threshold: float
-        Use to thresholding on the matched similarity, only consider cosine distance thresholding for now
-
-    Returns
-    -------
-    recalls : Dict[List[bool]]
-        List of fns: true indicates a FN
-        List of fps: true indicates a FP
+        Returns
+        -------
+        recalls : Dict[List[bool]]
+            List of fns: true indicates a FN
+            List of fps: true indicates a FP
 
     """
     offset = 0
@@ -259,12 +259,11 @@ def fp_fn_eval(query_features: torch.Tensor,
     index.add(g_f)
     distances, closest_indices = index.search(q_f, max_k + offset)
     
-    indices = closest_indices[:, offset:k + offset]
+    indices = closest_indices[:, offset:max_k + offset]
     # fns
-    fns = ((distances[:, offset:k + offset] < threshold)).any(1)  # 1st neighbor is far
-    fps = ((q_l[:, None] != g_l[indices]) * (distances[:, offset:k + offset] >= threshold)).any(1) # 1st neighbor is close but not having the same class label
+    fns = ((distances[:, offset:max_k + offset] < threshold)).any(1)  # 1st neighbor is far --> FN
+    fps = ((q_l[:, None] != g_l[indices]) * (distances[:, offset:max_k + offset] >= threshold)).any(1) # 1st neighbor is close but not having the same class label
          
     return fns, fps
-
 
 

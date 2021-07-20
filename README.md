@@ -54,6 +54,27 @@ In-Shop
 python experiment.py with dataset.inshop model.resnet50 epochs=100 lr=0.003 momentum=0.99 nesterov=True model.norm_layer=batch
 ```
 
+## To train AE
+CUB200
+```bash
+python autoencoder_experiment.py with dataset.cub_vae vae.ae
+```
+
+CARS-196
+```bash
+python autoencoder_experiment.py with dataset.cars_vae vae.ae
+```
+
+Stanford Online Products
+```bash
+python autoencoder_experiment.py with dataset.sop_vae vae.ae
+```
+
+In-Shop
+```bash
+python autoencoder_experiment.py with dataset.inshop_vae vae.ae
+```
+
 ## Citation
 ```bibtex
 @inproceedings{boudiaf2020unifying,

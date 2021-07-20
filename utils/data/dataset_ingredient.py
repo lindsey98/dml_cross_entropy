@@ -72,6 +72,53 @@ def inshop():
     
     data_path = 'data/InShop'
     recalls = [1, 10, 20, 30, 40, 50]
+    
+    
+@data_ingredient.named_config
+def cub_vae():
+    name = 'cub_vae'
+    data_path = 'data/CUB_200_2011'
+    train_file = 'train_small.txt'
+    test_file = 'test_new.txt'    
+    resize = (64, 64)
+    crop_size = 64
+    color_jitter = (0.25, 0.25, 0.25, 0)
+
+
+@data_ingredient.named_config
+def cars_vae():
+    name = 'cars_vae'
+    train_file = 'train_small.txt'
+    test_file = 'test_new.txt'  
+    data_path = 'data/CARS_196'
+    resize = (64, 64)
+    crop_size = 64
+    color_jitter = (0.3, 0.3, 0.3, 0.1)
+    ratio = (1., 1.)
+
+
+@data_ingredient.named_config
+def sop_vae():
+    name = 'sop_vae'
+    train_file = 'train_small.txt'
+    test_file = 'test_new.txt'  
+    data_path = 'data/Stanford_Online_Products'
+    resize = (64, 64)
+    crop_size = 64
+    recalls = [1, 10, 100, 1000]
+
+
+@data_ingredient.named_config
+def inshop_vae():
+    name = 'inshop_vae'
+    train_file = 'train_small.txt'
+    test_file = 'test_new.txt'  
+    resize = (64, 64)
+    crop_size = 64
+    data_path = 'data/InShop'
+    recalls = [1, 10, 20, 30, 40, 50]
+
+
 
 
 @data_ingredient.capture
@@ -163,4 +210,4 @@ def get_loaders(batch_size, test_batch_size, num_workers, pin_memory, sampler, r
     pool_loader = DataLoader(pool_set, batch_size=test_batch_size, num_workers=num_workers, pin_memory=pin_memory)
     return MetricLoaders(train=train_loader, query=query_loader, pool=pool_loader, gallery=gallery_loader, 
                          train_noshuffle = train_noshuffle,
-                         num_classes=max(train_set.targets) + 1), recalls
+                         num_classes=len(set(train_set.targets))), recalls

@@ -32,3 +32,34 @@ class SmoothCrossEntropy(nn.Module):
         target_probs = torch.full_like(logits, self.epsilon / (logits.shape[1] - 1))
         target_probs.scatter_(1, labels.unsqueeze(1), 1 - self.epsilon)
         return F.kl_div(torch.log_softmax(logits, 1), target_probs, reduction='none').sum(1)
+    
+    
+class VAELoss(nn.Module):
+    def __init__(self, kld_weight: float = 0.005):
+        super(VAELoss, self).__init__()
+        self.kld_weight = float(kld_weight)
+    
+    def forward(self, recons: torch.Tensor, input: torch.Tensor, mu: torch.Tensor, log_var: torch.Tensor) -> dict:
+        
+        recons_loss = F.binary_cross_entropy(recons, input)
+        kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
+        loss = recons_loss + self.kld_weight * kld_loss
+        loss_dict = {'loss':loss, 'reconstruct':recons_loss, 'kld_loss': -kld_loss}
+        print(loss_dict)
+        return loss_dict
+    
+    
+class AELoss(nn.Module):
+    def __init__(self):
+        super(AELoss, self).__init__()
+    
+    def forward(self, recons: torch.Tensor, input: torch.Tensor) -> dict:
+        recons_loss = F.binary_cross_entropy(recons, input)
+        loss = recons_loss 
+        loss_dict = {'loss':loss, 'reconstruct':recons_loss}
+#         print(loss_dict)
+        return loss_dict
+
+
+
+
