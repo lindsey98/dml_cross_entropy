@@ -16,6 +16,7 @@ from utils.metrics import AverageMeter, recall_at_ks
 
 def train(model: nn.Module,
           loader: DataLoader,
+          labeldict: Dict,
           class_loss: nn.Module,
           optimizer: Optimizer,
           scheduler: _LRScheduler,
@@ -32,6 +33,7 @@ def train(model: nn.Module,
 
     pbar = tqdm(loader, ncols=80, desc='Training   [{:03d}]'.format(epoch))
     for i, (batch, labels, indices) in enumerate(pbar):
+        labels = torch.tensor([labeldict[x] for x in labels.numpy()])
         batch, labels, indices = map(to_device, (batch, labels, indices))
         logits, features = model(batch)
         loss = class_loss(logits, labels).mean()

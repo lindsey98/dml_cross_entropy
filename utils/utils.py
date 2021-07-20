@@ -31,6 +31,8 @@ class SmoothCrossEntropy(nn.Module):
     def forward(self, logits: torch.Tensor, labels: torch.LongTensor) -> torch.Tensor:
         target_probs = torch.full_like(logits, self.epsilon / (logits.shape[1] - 1))
         target_probs.scatter_(1, labels.unsqueeze(1), 1 - self.epsilon)
+        loss = F.kl_div(torch.log_softmax(logits, 1), target_probs, reduction='none').sum(1)
+#         print(loss)
         return F.kl_div(torch.log_softmax(logits, 1), target_probs, reduction='none').sum(1)
     
     

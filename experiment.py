@@ -109,7 +109,7 @@ def main(epochs, cpu, cudnn_flag, visdom_port, visdom_freq, temp_dir, seed, no_b
         if cudnn_flag == 'benchmark':
             setattr(cudnn, cudnn_flag, True)
 
-        train(model=model, loader=loaders.train, class_loss=class_loss, optimizer=optimizer,
+        train(model=model, labeldict=loaders.labeldict, loader=loaders.train, class_loss=class_loss, optimizer=optimizer,
               scheduler=scheduler, epoch=epoch, callback=callback, freq=visdom_freq, ex=ex)
 
         # validation
