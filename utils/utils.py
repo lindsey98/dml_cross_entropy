@@ -33,7 +33,7 @@ class SmoothCrossEntropy(nn.Module):
         target_probs.scatter_(1, labels.unsqueeze(1), 1 - self.epsilon)
         loss = F.kl_div(torch.log_softmax(logits, 1), target_probs, reduction='none').sum(1)
 #         print(loss)
-        return F.kl_div(torch.log_softmax(logits, 1), target_probs, reduction='none').sum(1)
+        return loss
     
     
 class VAELoss(nn.Module):

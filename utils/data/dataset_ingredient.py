@@ -52,6 +52,14 @@ def cars():
     color_jitter = (0.3, 0.3, 0.3, 0.1)
     ratio = (1., 1.)
 
+@data_ingredient.named_config
+def logo2k():
+    name = 'logo2k'
+    train_file = 'train_small.txt'
+    test_file = 'test_new.txt'  
+    data_path = 'data/logo2k-data'
+    resize = (256, 256)
+    ratio = (1., 1.)
 
 @data_ingredient.named_config
 def sop():
@@ -117,8 +125,6 @@ def inshop_vae():
     crop_size = 64
     data_path = 'data/InShop'
     recalls = [1, 10, 20, 30, 40, 50]
-
-
 
 
 @data_ingredient.capture
@@ -236,11 +242,8 @@ def get_loaders(batch_size, test_batch_size, num_workers, pin_memory, sampler, r
         if int(label) not in labeldict.keys():
             labeldict[int(label)] = i
             i += 1
- 
-#     print(max(labeldict.keys()))
-#     print(max(labeldict.values()))
+
     print(labeldict)
-    
             
     pool_loader = DataLoader(pool_set, batch_size=test_batch_size, num_workers=num_workers, pin_memory=pin_memory)
     return MetricLoaders(train=train_loader, query=query_loader, pool=pool_loader, gallery=gallery_loader, 
@@ -248,3 +251,4 @@ def get_loaders(batch_size, test_batch_size, num_workers, pin_memory, sampler, r
                          num_classes=len(set(train_set.targets)),
                          labeldict=labeldict,
                          query_novel=query_novel_loader), recalls
+

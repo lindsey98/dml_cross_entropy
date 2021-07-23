@@ -1,0 +1,58 @@
+DATA:
+    Name: 'inshop'
+    Path:
+        data_path: 'data/InShop'
+        train_file: 'train_small.txt'
+        test_file: 'test_new.txt'
+        pool_file: 'pool.txt'
+
+    Sampler:
+        batch_size: 128
+        test_batch_size: 256
+        sampler: 'random'
+        preload: False  # load all images into RAM to avoid IO
+        num_workers: 8  # number of workers used ot load the data
+        pin_memory: False  # use the pin_memory option of DataLoader
+        num_iterations: null
+        num_identities: null
+        
+    Aug:
+        crop_size: 224
+        scale: (0.16, 1)
+        ratio: (3. / 4., 4. / 3.)
+        recalls: [1, 2, 4, 8, 16, 32]
+        resize: 256
+        rotate: null
+        color_jitter: null
+        
+Train:
+    epochs: 100
+    lr: 0.003
+    momentum: 0.99
+    nesterov: True
+    weight_decay: 5e-4
+    scheduler: 'warmcos'
+
+    visdom_port: None
+    visdom_freq: 20
+    cpu: False  # Force training on CPU
+    cudnn_flag: 'benchmark'
+    temp_dir: 'checkpoints'
+
+    no_bias_decay: True
+    label_smoothing: 0.1
+    
+    lr_step: null
+    seed: 1234
+    
+MODEL:
+    arch: 'resnet50'
+    num_features: 2048
+    dropout: 0.5
+    pretrained: True  # use a pretrained model from torchvision
+    norm_layer: 'batch'  # use a normalization layer (batchnorm or layernorm) for the features
+    remap: False  # remap features through a linear layer
+    detach: False  # detach features before feeding to the classification layer. Prevents training of the feature extractor with cross-entropy.
+    normalize: False  # normalize the features
+    set_bn_eval: True  # set bn in eval mode even in training
+    normalize_weight: False  # normalize the weights of the classification layer
