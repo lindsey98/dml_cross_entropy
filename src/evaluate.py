@@ -83,7 +83,9 @@ def evaluator(query_features: torch.Tensor,
     return (tp, fn, fp, tn)
 
 
-def evaluator_aggregate(model: nn.Module, loaders: MetricLoaders, recall_ks: List[int]) -> float:
+def evaluator_aggregate(model: nn.Module, 
+                        loaders: MetricLoaders, 
+                        recall_ks: List[int]) -> float:
     '''
         Aggregate evaluation results over multiple thresholds and multiple k
     '''        
@@ -99,14 +101,16 @@ def evaluator_aggregate(model: nn.Module, loaders: MetricLoaders, recall_ks: Lis
                             ks = recall_ks)
     
     tp, fn, fp, tn = {}, {}, {}, {}
-    for threshold in np.arange(0.7, 0.95, 0.05):
+    for threshold in np.arange(0.5, 0.95, 0.05):
         tp[threshold], fn[threshold], fp[threshold], tn[threshold] = eval_function(threshold=threshold)
     
     torch.cuda.empty_cache()
     matching_acc = []
-    for threshold in np.arange(0.7, 0.95, 0.05):
+    for threshold in np.arange(0.5, 0.95, 0.05):
         for nn in recall_ks:
-            acc = (tp[threshold][nn] + tn[threshold][nn]) / (fp[threshold][nn] + fn[threshold][nn] + tp[threshold][nn] + tn[threshold][nn])
+            total = (fp[threshold][nn] + fn[threshold][nn] + tp[threshold][nn] + tn[threshold][nn])
+            correct = (tp[threshold][nn] + tn[threshold][nn])
+            acc = correct / total
             matching_acc.append(acc)
     matching_acc = np.mean(matching_acc)
     

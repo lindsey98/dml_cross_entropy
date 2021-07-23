@@ -74,11 +74,9 @@ def training(model: nn.Module, loader: DataLoader,
     pbar = tqdm(loader, ncols=80, desc='Training   [{:03d}]'.format(epoch))
     for i, (batch, labels, indices) in enumerate(pbar):
         labels = torch.tensor([labeldict[x] for x in labels.numpy()])
-#         print(labels)
         batch, labels, indices = map(to_device, (batch, labels, indices))
         logits, features = model(batch)
         loss = class_loss(logits, labels).mean()
-#         print(loss)
 
         optimizer.zero_grad()
         loss.backward()

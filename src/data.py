@@ -22,9 +22,11 @@ from tqdm import tqdm
 import logging
 import yaml
 import faiss
+from typing import Tuple, List
 
 
-def get_transforms(crop_size, scale, ratio, resize=None, rotate=None, color_jitter=None):
+def get_transforms(crop_size: int, scale: Tuple[float], ratio: Tuple[float], 
+                   resize=None, rotate=None, color_jitter=None) -> (transforms.Compose, transforms.Compose):
     '''
         Return list of transformations applied on training and testing
     '''
@@ -50,12 +52,12 @@ def get_transforms(crop_size, scale, ratio, resize=None, rotate=None, color_jitt
 
 
 
-def read_file(filename):
+def read_file(filename: str) -> List:
     with open(filename) as f:
         lines = f.read().splitlines()
     return lines
 
-def get_sets(cfg: Dict):
+def get_sets(cfg: Dict) -> (ImageDataset, ImageDataset, (ImageDataset, ImageDataset, ImageDataset, ImageDataset)):
     '''
         Prepared dataset
     '''
