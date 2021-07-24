@@ -106,12 +106,26 @@ def evaluator_aggregate(model: nn.Module,
     
     torch.cuda.empty_cache()
     matching_acc = []
+    avg_tp = []
+    avg_fp = []
+    avg_tn = []
+    avg_fn = []
+    
     for threshold in np.arange(0.5, 0.95, 0.05):
         for nn in recall_ks:
             total = (fp[threshold][nn] + fn[threshold][nn] + tp[threshold][nn] + tn[threshold][nn])
             correct = (tp[threshold][nn] + tn[threshold][nn])
             acc = correct / total
             matching_acc.append(acc)
+            avg_tp.append(tp[threshold][nn])
+            avg_fp.append(fp[threshold][nn])
+            avg_tn.append(tn[threshold][nn])
+            avg_fn.append(fn[threshold][nn])
+
     matching_acc = np.mean(matching_acc)
-    
-    return matching_acc
+    avg_tp = np.mean(avg_tp)
+    avg_fp = np.mean(avg_fp)
+    avg_tn = np.mean(avg_tn)
+    avg_fn = np.mean(avg_fn)
+
+    return matching_acc, avg_tp, avg_fp, avg_tn, avg_fn

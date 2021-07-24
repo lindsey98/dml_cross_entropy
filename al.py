@@ -40,7 +40,7 @@ def run(cfg: Dict,
     torch.manual_seed(seed)
     for epoch in range(epochs):
 
-        training(model=model, 
+        model=training(model=model, 
                   labeldict=loaders.labeldict, 
                   loader=loaders.train, 
                   class_loss=class_loss, 
@@ -50,12 +50,17 @@ def run(cfg: Dict,
                   logger=logger)
 
     # saving
-    save_name = os.path.join(temp_dir, '{}_{}_{}.pt'.format(cfg['MODEL']['arch'], cfg['DATA']['Name'], cfg['AL']['Strategy']))
+    save_name = os.path.join(temp_dir, '{}_{}.pt'.format(cfg['MODEL']['arch'], cfg['DATA']['Name']))
     torch.save(model.state_dict(), save_name)
+    return model
     
     
     
 def al_loop(args) -> None:
+    '''
+        AL loop: Initial model --> AL selector --> Updated dataloader --> Retrain
+                       |____________________________________________________|
+    '''
     
     os.makedirs('log', exist_ok=True)
 
@@ -97,19 +102,19 @@ def al_loop(args) -> None:
 
     
     ##### main AL loop #####
-    for it in range(args.al_iter):
+    for it in range(1, args.al_iter+1):
 
         logger.info('Current AL iteration {}, Number of unlabelled samples been queried {}, Training size {} | Pool size {} | Test size {}, Number of distinct classes in gallery/training set {}'.format(it, sampled_size, training_size, pool_size, test_size, loaders.num_classes))
+        
+        # evaluate test matching acc!
+        matching_acc, avg_tp, avg_fp, avg_tn, avg_fn = evaluator_aggregate(model=cur_model, loaders=loaders, recall_ks=recall_ks)
+        print('Testing matching Acc at current iteration = {}, Avg TPs = {}, Avg FPs = {}, Avg TNs = {}, Avg FNs = {}'.format(matching_acc, avg_tp, avg_fp, avg_tn, avg_fn))
+        logger.info('Testing matching Acc at current iteration = {}, Avg TPs = {}, Avg FPs = {}, Avg TNs = {}, Avg FNs = {}'.format(matching_acc, avg_tp, avg_fp, avg_tn, avg_fn))
 
         # limited budget
         if sampled_size >= training_size or sampled_size >= pool_size * 0.9:
             break
 
-        # evaluate test matching acc!
-        matching_acc = evaluator_aggregate(model=cur_model, loaders=loaders, recall_ks=recall_ks)
-        print('Testing matching Acc at current iteration = {}'.format(matching_acc))
-        logger.info('Testing matching Acc at current iteration = {}'.format(matching_acc))
-        
         # extract features
         all_pool_features, all_pool_labels, all_pool_samples = feature_extractor(model=cur_model, loaders=loaders.pool)
         all_gallery_features, all_gallery_labels, all_gallery_samples = feature_extractor(model=cur_model, loaders=loaders.train_noshuffle)
@@ -149,7 +154,7 @@ def al_loop(args) -> None:
         logger.info(cur_cfg)
 
         # update dataloader, update model
-        torch.cuda.empty_cache()
+        torch.cuda.empty_cache() # empty cuda cache
         torch.manual_seed(seed)
         loaders, recall_ks = get_loaders(cur_cfg)
         training_size = len(loaders.train_noshuffle.dataset)
@@ -162,11 +167,14 @@ def al_loop(args) -> None:
         cur_model.to(device)
         cur_model = nn.DataParallel(cur_model)
 
-        # retrain!
-        run(cfg=cur_cfg, loaders=loaders, recall_ks=recall_ks, model=cur_model, logger=logger)
+        # retrain the model!
+        cur_model = run(cfg=cur_cfg, loaders=loaders, recall_ks=recall_ks, model=cur_model, logger=logger)
 
         
 def argparser() -> argparse.ArgumentParser:
+    '''
+        Parse arguments
+    '''
     parser = argparse.ArgumentParser(description="Fine-tune BiT-M model.")
     parser.add_argument("--config_file", required=True,
                       help="Path to config.yaml")

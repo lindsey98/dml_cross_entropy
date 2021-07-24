@@ -29,11 +29,11 @@ def get_optimizer_scheduler(cfg: Dict, parameters: Dict, loader_length: int) -> 
     '''
         Initialize optimizer and lr_scheduler
     '''
-    epochs = cfg['Train']['epochs']
-    lr = cfg['Train']['lr']
-    momentum = cfg['Train']['momentum']
+    epochs = int(cfg['Train']['epochs'])
+    lr = float(cfg['Train']['lr'])
+    momentum = float(cfg['Train']['momentum'])
     nesterov = cfg['Train']['nesterov']
-    weight_decay = cfg['Train']['weight_decay']
+    weight_decay = float(cfg['Train']['weight_decay'])
     scheduler = cfg['Train']['scheduler']
     lr_step = cfg['Train']['lr_step']
     
@@ -88,4 +88,4 @@ def training(model: nn.Module, loader: DataLoader,
     logger.info('Epoch {} train.loss = {}'.format(epoch, train_losses.last_avg))
         
 
-
+    return model

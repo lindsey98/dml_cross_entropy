@@ -95,6 +95,8 @@ def main(epochs, cpu, cudnn_flag, visdom_port, visdom_freq, temp_dir, seed, no_b
     # setup partial function to simplify call
     eval_function = partial(evaluate, model=model, recall=recall_ks, query_loader=loaders.query,
                             gallery_loader=loaders.gallery)
+    print(len(loaders.train.dataset))
+    print(len(loaders.query.dataset))
 
     # setup best validation logger
     metrics = eval_function()

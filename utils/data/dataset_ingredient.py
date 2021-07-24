@@ -58,6 +58,7 @@ def logo2k():
     train_file = 'train_small.txt'
     test_file = 'test_new.txt'  
     data_path = 'data/logo2k-data'
+    batch_size = 128
     resize = (256, 256)
     ratio = (1., 1.)
 

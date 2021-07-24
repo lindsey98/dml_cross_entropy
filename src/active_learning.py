@@ -72,7 +72,7 @@ def selector(all_gallery_features: torch.Tensor, all_gallery_labels: torch.Tenso
         return (selected_indices, entropy)
     
     elif strategy == 'random':
-        selected_indices = np.random.choice(len(all_pool_features), selected_k)
+        selected_indices = np.random.choice(len(all_pool_features), selected_k, replace=False)
         return (selected_indices, None)
     
     else:

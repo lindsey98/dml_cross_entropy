@@ -51,7 +51,7 @@ MODEL:
     num_features: 2048
     dropout: 0.5
     pretrained: True  # use a pretrained model from torchvision
-    norm_layer: 'batch'  # use a normalization layer (batchnorm or layernorm) for the features
+    norm_layer: None  # use a normalization layer (batchnorm or layernorm) for the features
     remap: False  # remap features through a linear layer
     detach: False  # detach features before feeding to the classification layer. Prevents training of the feature extractor with cross-entropy.
     normalize: False  # normalize the features
@@ -60,4 +60,4 @@ MODEL:
     
     
 AL:
-    Strategy: "margin"
+    Strategy: "random"
