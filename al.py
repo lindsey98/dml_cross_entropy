@@ -104,12 +104,17 @@ def al_loop(args) -> None:
     ##### main AL loop #####
     for it in range(1, args.al_iter+1):
 
-        logger.info('Current AL iteration {}, Number of unlabelled samples been queried {}, Training size {} | Pool size {} | Test size {}, Number of distinct classes in gallery/training set {}'.format(it, sampled_size, training_size, pool_size, test_size, loaders.num_classes))
+        logger.info('Current AL iteration {}, \n
+                     Number of unlabelled samples been queried {}, \n
+                     Current Training size {} | Pool size {} | Test size {}, \n
+                     Number of distinct classes in gallery/training set {} \n'.format(it, 
+                                                                                      sampled_size, training_size, 
+                                                                                      pool_size, test_size, loaders.num_classes))
         
         # evaluate test matching acc!
         matching_acc, avg_tp, avg_fp, avg_tn, avg_fn = evaluator_aggregate(model=cur_model, loaders=loaders, recall_ks=recall_ks)
-        print('Testing matching Acc at current iteration = {}, Avg TPs = {}, Avg FPs = {}, Avg TNs = {}, Avg FNs = {}'.format(matching_acc, avg_tp, avg_fp, avg_tn, avg_fn))
-        logger.info('Testing matching Acc at current iteration = {}, Avg TPs = {}, Avg FPs = {}, Avg TNs = {}, Avg FNs = {}'.format(matching_acc, avg_tp, avg_fp, avg_tn, avg_fn))
+        print('Avg Testing matching Acc at current iteration = {}, Avg TPs = {}, Avg FPs = {}, Avg TNs = {}, Avg FNs = {}'.format(matching_acc, avg_tp, avg_fp, avg_tn, avg_fn))
+        logger.info('Avg Testing matching Acc at current iteration = {}, Avg TPs = {}, Avg FPs = {}, Avg TNs = {}, Avg FNs = {}'.format(matching_acc, avg_tp, avg_fp, avg_tn, avg_fn))
 
         # limited budget
         if sampled_size >= training_size or sampled_size >= pool_size * 0.9:
@@ -126,6 +131,28 @@ def al_loop(args) -> None:
                                        selected_k = int(0.1*training_size))
 
         selected_samples = np.asarray(all_pool_samples)[selected_indices]
+        
+        # Evaluate how many FPs, FNs has been selected using the best threshold and 1st NN
+        # first choose best threshold by F1 score
+        best_f1, best_threshold = threshold_finder(model=cur_model, loaders=loaders)
+        print('Best f1 score = {} @ threshold = {}\n'.format(best_f1, best_threshold))
+        logger.info('Best f1 score = {} @ threshold = {}\n'.format(best_f1, best_threshold))
+
+        # then get FP, FN coverage
+        (total_fn, total_fp), (fn_selected, fp_selected) = evaluator_selector(model=cur_model, 
+                                                                               loaders=loaders, 
+                                                                               selected_indices=selected_indices,
+                                                                               threshold=best_threshold)
+        print('Total # of instances selected = {}, \n
+              # selected FNs at current iteration = {} out of total {} FNs, \n
+              # selected FPs at current iteration = {} out of total {} FPs \n'.format(len(selected_samples), 
+                                                                                      len_fn_selected, total_fn, 
+                                                                                      len_fp_selected, total_fp))
+        logger.info('Total # of instances selected = {}, \n
+                     # selected FNs at current iteration = {} out of total {} FNs, \n
+                     # selected FPs at current iteration = {} out of total {} FPs \n'.format(len(selected_samples), 
+                                                                                          len_fn_selected, total_fn, 
+                                                                                          len_fp_selected, total_fp))
 
         # update after AL
         # update original data file

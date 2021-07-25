@@ -38,7 +38,8 @@ class SmoothCrossEntropy(nn.Module):
         # LogSoftMax for logits
         softmax_logits = F.softmax(logits, 1)
         logsoftmax_logits = torch.log(softmax_logits + 1e-5) # manually control underflow
-        loss = F.kl_div(logsoftmax_logits, target_probs, reduction='none').sum(1)
+        loss = F.kl_div(logsoftmax_logits, target_probs, reduction='none').sum(1) 
+        # kl_divergence = \sum p(y) * log(p(yhat)/p(y)) while CE = - \sum p(y) * log(p(yhat))
         
         if torch.isnan(loss).any(): 
     #         print('labels:', labels)

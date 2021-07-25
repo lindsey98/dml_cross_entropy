@@ -21,7 +21,6 @@ from torchvision import transforms
 from utils.metrics import AverageMeter
 from src.data import MetricLoaders
 
-# from models.architectures import __all__, __dict__
 from tqdm import tqdm
 import logging
 import yaml
@@ -63,6 +62,22 @@ def selector(all_gallery_features: torch.Tensor, all_gallery_labels: torch.Tenso
         selected_indices = margin_query2gallery.argsort()[:selected_k] # those data points that are near boundary
         return (selected_indices, margin_query2gallery)
     
+    elif strategy == 'mixed':
+        query_features = F.normalize(all_pool_features, p=2, dim=1).numpy()
+        dist = np.dot(query_features, centroids.T)
+        
+        ind = np.argsort(dist, axis=1)
+        sorted_dist = np.take_along_axis(dist, ind, axis=1)
+        margin_query2gallery = sorted_dist[:, -1] - sorted_dist[:, -2]
+        query2gallery = sorted_dist[:, -1]
+        
+        # first sort by margin, then sort by confidence to strike a balance between selecting FN and FP
+        sorted_index_bymargin = margin_query2gallery.argsort()[:2*selected_k] # ascending order, select lowest 2*selected_k 
+        sorted_index_byconf = query2gallery[sorted_index_bymargin].argsort() # nested sort, ascending order
+        selected_indices = sorted_index_bymargin[sorted_index_byconf[:int(selected_k/2)]] + \
+                           sorted_index_bymargin[sorted_index_byconf[-int(selected_k/2):]]
+        return (selected_indices, None)
+    
     elif strategy == 'entropy':
         query_features = F.normalize(all_pool_features, p=2, dim=1).numpy()
         dist = np.dot(query_features, centroids.T)
@@ -78,29 +93,3 @@ def selector(all_gallery_features: torch.Tensor, all_gallery_labels: torch.Tenso
     else:
         raise NotImplementedError
         
-def feature_extractor(model: nn.Module, 
-                      loaders: MetricLoaders) -> (torch.Tensor, torch.Tensor, List):
-    '''
-      Extract feature embeddings given a DataLoader
-    '''
-    device = next(model.parameters()).device
-
-    all_query_labels = []
-    all_query_features = []
-
-    with torch.no_grad():
-        for batch, labels, _ in tqdm(loaders, desc='Extracting features', leave=False, ncols=80):
-            batch, labels = batch.to(device), labels.to(device)
-            logits, features = model(batch)
-
-            all_query_labels.append(labels)
-            all_query_features.append(features)
-
-    torch.cuda.empty_cache()
-    all_query_labels = torch.cat(all_query_labels, 0)
-    all_query_features = torch.cat(all_query_features, 0)
-    all_query_samples = loaders.dataset.samples
-    
-    assert len(all_query_features) == len(all_query_labels) == len(all_query_samples)
-    
-    return all_query_features.detach().cpu(), all_query_labels.detach().cpu(), all_query_samples
