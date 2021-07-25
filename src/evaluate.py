@@ -163,6 +163,7 @@ def evaluator_aggregate(model: nn.Module,
                         loaders: MetricLoaders, 
                         recall_ks: List[int]) -> float:
     '''
+        Evaluator for current model on test set
         Aggregate evaluation results over multiple thresholds and multiple k
     '''        
     
@@ -215,14 +216,15 @@ def evaluator_selector(model: nn.Module,
                        selected_indices: Union[np.ndarray, List],
                        threshold: float) -> ((List, List), (int, int)):
     '''
+        Evaluator for selector on unlabelled pool set
         Record how many FPs FNs are inside the selected indices
     '''
     gallery_features, gallery_labels, _ = feature_extractor(model=model, loaders=loaders.train_noshuffle)
-    query_features, query_labels, _ = feature_extractor(model=model, loaders=loaders.query)
+    pool_features, pool_labels, _ = feature_extractor(model=model, loaders=loaders.pool)
     
     # Evaluate
-    fn_indices, fp_indices = fpfn_extractor(query_features=query_features, 
-                                            query_labels=query_labels,
+    fn_indices, fp_indices = fpfn_extractor(query_features=pool_features, 
+                                            query_labels=pool_labels,
                                             gallery_features=gallery_features,
                                             gallery_labels=gallery_labels,
                                             ks = 1,
@@ -230,8 +232,8 @@ def evaluator_selector(model: nn.Module,
                                             threshold = threshold)
     
     # Get overlapping indices
-    fn_selected_indices = list(set(fn_indices).intersect(set(selected_indices)))
-    fp_selected_indices = list(set(fp_indices).intersect(set(selected_indices)))
+    fn_selected_indices = list(set(fn_indices).intersection(set(selected_indices)))
+    fp_selected_indices = list(set(fp_indices).intersection(set(selected_indices)))
     
 
     return (len(fn_indices), len(fp_indices)), (len(fn_selected_indices), len(fp_selected_indices))
@@ -241,6 +243,7 @@ def evaluator_selector(model: nn.Module,
 def threshold_finder(model: nn.Module,
                     loaders: MetricLoaders) -> (float, float):
     '''
+        Threshold finder on gallery set
         Decide which matching threshold is the best using gallery/training set only
     '''
     
