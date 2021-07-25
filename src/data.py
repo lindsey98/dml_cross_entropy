@@ -13,8 +13,8 @@ from torch.utils.data import DataLoader
 from typing import NamedTuple, Optional, Dict, List, Any
 from torchvision import transforms
 
-from src.data.image_dataset import ImageDataset
-from src.data.utils import RandomReplacedIdentitySampler
+from src.data_utils.image_dataset import ImageDataset
+from src.data_utils.utils import RandomReplacedIdentitySampler
 from torch.utils.data import DataLoader, RandomSampler, BatchSampler
 
 from tqdm import tqdm

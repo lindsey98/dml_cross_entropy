@@ -122,20 +122,21 @@ def al_loop(args) -> None:
         all_gallery_features, all_gallery_labels, all_gallery_samples = feature_extractor(model=cur_model,
                                                                                           loaders=loaders.train_noshuffle)
         
-        # AL selector
-        selected_indices, S = selector(all_gallery_features, all_gallery_labels, 
-                                       all_pool_features, all_pool_labels, 
-                                       strategy = al_strategy, 
-                                       selected_k = int(0.1*training_size))
-
-        selected_samples = np.asarray(all_pool_samples)[selected_indices]
-        
-        # Evaluate how many FPs, FNs has been selected using the best threshold and 1st NN
         # first choose best threshold by F1 score
         best_f1, best_threshold = threshold_finder(model=cur_model, loaders=loaders)
         print("Best f1 score = {} @ threshold = {}".format(best_f1, best_threshold))
         logger.info("Best f1 score = {} @ threshold = {}".format(best_f1, best_threshold))
 
+        # AL selector
+        selected_indices, S = selector(all_gallery_features, all_gallery_labels, 
+                                       all_pool_features, all_pool_labels, 
+                                       strategy = al_strategy, 
+                                       selected_k = int(0.1*training_size),
+                                       threshold = best_threshold)
+
+        selected_samples = np.asarray(all_pool_samples)[selected_indices]
+        
+        # Evaluate how many FPs, FNs has been selected using the best threshold and 1st NN
         # then get FP, FN coverage
         (total_fn, total_fp), (fn_selected, fp_selected) = evaluator_selector(model=cur_model, 
                                                                                loaders=loaders, 

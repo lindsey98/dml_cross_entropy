@@ -30,7 +30,9 @@ import numpy as np
 
 def selector(all_gallery_features: torch.Tensor, all_gallery_labels: torch.Tensor, 
              all_pool_features: torch.Tensor, all_pool_labels: torch.Tensor, 
-             strategy:str, selected_k:int) -> (Union[List, np.ndarray], Any):
+             strategy:str, 
+             selected_k:int,
+             threshold: float) -> (Union[List, np.ndarray], Any):
     '''
        AL unlabelled selector 
     '''
@@ -73,16 +75,19 @@ def selector(all_gallery_features: torch.Tensor, all_gallery_labels: torch.Tenso
         sorted_dist = np.take_along_axis(dist2c, ind, axis=1)
         margin_query2gallery = sorted_dist[:, -1] - sorted_dist[:, -2]
         
-        # compute distance to all gallery data (tried centroids but it couldnt find FNs)
+        # compute distance to all gallery data (tried centroids but it couldnt cover all FNs)
         dist2g = np.dot(query_features, gallery_features.T)
         ind = np.argsort(dist2g, axis=1)
         sorted_dist = np.take_along_axis(dist2g, ind, axis=1)
         query2gallery = sorted_dist[:, -1]
         
-        # half selected by confidence, then half by margin to strike a balance between selecting FN and FP
-        sorted_index_byconf = query2gallery.argsort()[:int(selected_k/2)]
-        sorted_index_bymargin = margin_query2gallery.argsort()[:int(selected_k/2)] 
-        selected_indices = list(set(sorted_index_byconf).union(set(sorted_index_bymargin)))
+        if np.sum(query2gallery >= threshold) == 0: # no negative already
+            selected_indices = margin_query2gallery.argsort()[:selected_k] # purely select by margin
+        else:
+            # half selected by confidence, then half by margin to strike a balance between selecting FN and FP
+            sorted_index_byconf = query2gallery.argsort()[:int(selected_k/2)]
+            sorted_index_bymargin = margin_query2gallery.argsort()[:int(selected_k/2)] 
+            selected_indices = list(set(sorted_index_byconf).union(set(sorted_index_bymargin)))
         
         return selected_indices, None
     
