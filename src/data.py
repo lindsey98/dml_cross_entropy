@@ -13,10 +13,9 @@ from torch.utils.data import DataLoader
 from typing import NamedTuple, Optional, Dict, List, Any
 from torchvision import transforms
 
-from utils.data.image_dataset import ImageDataset
-from utils.data.utils import RandomReplacedIdentitySampler
+from src.data.image_dataset import ImageDataset
+from src.data.utils import RandomReplacedIdentitySampler
 from torch.utils.data import DataLoader, RandomSampler, BatchSampler
-
 
 from tqdm import tqdm
 import logging

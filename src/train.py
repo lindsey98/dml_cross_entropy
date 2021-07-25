@@ -11,14 +11,14 @@ import torch.nn.functional as F
 from torch.backends import cudnn
 from torch.optim import SGD, lr_scheduler
 
-from utils import state_dict_to_cpu, SmoothCrossEntropy
+from src.utils import state_dict_to_cpu, SmoothCrossEntropy
 from torch.utils.data import DataLoader
 from typing import NamedTuple, Optional, Dict, List, Any
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 from torchvision import transforms
 
-from utils.metrics import AverageMeter
+from src.metrics import AverageMeter
 
 from tqdm import tqdm
 import logging
