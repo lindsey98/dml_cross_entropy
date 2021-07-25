@@ -79,13 +79,6 @@ def selector(all_gallery_features: torch.Tensor, all_gallery_labels: torch.Tenso
         sorted_dist = np.take_along_axis(dist2g, ind, axis=1)
         query2gallery = sorted_dist[:, -1]
         
-#         # first sort by margin, then sort by confidence to strike a balance between selecting FN and FP
-#         sorted_index_bymargin = margin_query2gallery.argsort()[:int(1.5*selected_k)] #ascending order, select lowest 1.5*selected_k 
-#         sorted_index_byconf = query2gallery[sorted_index_bymargin].argsort() # nested sort, ascending order
-#         # get selected indices balanced between FP, FN
-#         selected_indices4fn = sorted_index_bymargin[sorted_index_byconf][:int(selected_k/2)]
-#         selected_indices4fp = sorted_index_bymargin[sorted_index_byconf][-int(selected_k/2):]
-        
         # half selected by confidence, then half by margin to strike a balance between selecting FN and FP
         sorted_index_byconf = query2gallery.argsort()[:int(selected_k/2)]
         sorted_index_bymargin = margin_query2gallery.argsort()[:int(selected_k/2)] 
