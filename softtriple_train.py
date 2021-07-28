@@ -65,19 +65,23 @@ def main(args):
     criterion = SoftTriple(cfg['Train']['la'], cfg['Train']['gamma'], cfg['Train']['tau'], 
                            cfg['Train']['margin'], cfg['MODEL']['num_features'], 
                            loaders.num_classes, cfg['Train']['K'])
-    # initialize proxies
-    all_gallery_feat, all_gallery_labels, _ = feature_extractor(model, loaders.train_noshuffle, loaders.labeldict)
-    criterion.proxy_initialize(all_gallery_feat, all_gallery_labels)
+    
+    if cfg['Train']['proxy_initialize']:
+        # initialize proxies
+        all_gallery_feat, all_gallery_labels, _ = feature_extractor(model, loaders.train_noshuffle, loaders.labeldict)
+        criterion.proxy_initialize(all_gallery_feat, all_gallery_labels)
+        print('Finish proxy initialization')
+        logger.info('Finish proxy initialization')
     criterion = criterion.to(device)
-    print('Finish proxy initialization')
-    logger.info('Finish proxy initialization')
+        
     # saving initial proxies
     save_name = os.path.join(cfg['Train']['temp_dir'], "{}_{}_proxyK{}_epoch{}.pt".format(cfg["MODEL"]["arch"], 
                                                                                  cfg["DATA"]["Name"], 
                                                                                  cfg["Train"]["K"], -1))
     torch.save(criterion.state_dict(), save_name)
-    measure = proxy_similarity(criterion)
+    
     if criterion.K > 1:
+        measure = proxy_similarity(criterion)
         writer.add_histogram('Proxy intersimilarity', measure, -1)
     
     # define optimizer, model parameters and proxy weights are using different learning rate, proxy learning rate is higher, because model weights are pretrained needs lower learning rate
@@ -90,7 +94,11 @@ def main(args):
     recalls = validate(loaders.query, model, loaders.labeldict)
     print('Recall@1, 2, 4, 8: {recall[1]:.3f}, {recall[2]:.3f}, {recall[4]:.3f}, {recall[8]:.3f} \n'.format(recall=recalls))
     logger.info('Recall@1, 2, 4, 8: {recall[1]:.3f}, {recall[2]:.3f}, {recall[4]:.3f}, {recall[8]:.3f}'.format(recall=recalls))
-
+    writer.add_scalar('Recall@1', recalls[1], -1)
+    writer.add_scalar('Recall@2', recalls[2], -1)
+    writer.add_scalar('Recall@4', recalls[4], -1)
+    writer.add_scalar('Recall@8', recalls[8], -1)
+            
     for epoch in range(cfg['Train']['epochs']):
         print('Training in Epoch[{}]'.format(epoch))
         adjust_learning_rate(optimizer, epoch, cfg) 
@@ -99,7 +107,7 @@ def main(args):
         training(model, loaders.train, loaders.labeldict, criterion, optimizer, None, epoch, logger)
         
         # save model
-        if epoch % 10 == 0:
+        if epoch % 5 == 0:
             os.makedirs(cfg['Train']['temp_dir'], exist_ok=True)
             # saving
             save_name = os.path.join(cfg['Train']['temp_dir'], "{}_{}.pt".format(cfg["MODEL"]["arch"], 
@@ -119,18 +127,20 @@ def main(args):
             writer.add_scalar('Recall@2', recalls[2], epoch)
             writer.add_scalar('Recall@4', recalls[4], epoch)
             writer.add_scalar('Recall@8', recalls[8], epoch)
-            
-        measure = proxy_similarity(criterion)
+        
         if criterion.K > 1:
+            measure = proxy_similarity(criterion)
             writer.add_histogram('Proxy intersimilarity', measure, epoch)
             
     # evaluate on test set
     recalls = validate(loaders.query, model, loaders.labeldict)
     print('Recall@1, 2, 4, 8: {recall[1]:.3f}, {recall[2]:.3f}, {recall[4]:.3f}, {recall[8]:.3f} \n'.format(recall=recalls))
     logger.info('Recall@1, 2, 4, 8: {recall[1]:.3f}, {recall[2]:.3f}, {recall[4]:.3f}, {recall[8]:.3f}'.format(recall=recalls))
-    measure = proxy_similarity(criterion)
+    
     if criterion.K > 1:
+        measure = proxy_similarity(criterion)
         writer.add_histogram('Proxy intersimilarity', measure, epoch)
+        
     writer.add_scalar('Recall@1', recalls[1], epoch)
     writer.add_scalar('Recall@2', recalls[2], epoch)
     writer.add_scalar('Recall@4', recalls[4], epoch)
@@ -147,15 +157,18 @@ def main(args):
     torch.save(criterion.state_dict(), save_name)
             
 
-def proxy_similarity(criterion: nn.Module) -> float:
+def proxy_similarity(criterion: nn.Module) -> torch.Tensor:
+    '''
+        Get intra-class proxy similarities
+    '''
     proxy = criterion.fc.detach().cpu()
     proxy = F.normalize(proxy, p=2, dim=0)
     simCenter = proxy.t().matmul(proxy) 
     
-    measure = simCenter[criterion.weight]
+    measure = simCenter[criterion.weight] # intra-class proxy similarity
     measure = measure.reshape(criterion.cN, -1)
-    measure = measure.mean(1)
-    
+    measure = measure.flatten() # flatten all pairs' similarity
+#     print(measure)
     return measure
 
 def validate(test_loader: DataLoader, 
@@ -182,7 +195,7 @@ def adjust_learning_rate(optimizer: Optimizer, epoch: int, cfg: Dict) -> None:
     ''' 
         Decay lr by 10 every 20 epochs
     '''
-    if (epoch+1)%20 == 0:
+    if (epoch+1) % 20 == 0:
         for param_group in optimizer.param_groups:
             param_group['lr'] *= cfg['Train']['rate']
             

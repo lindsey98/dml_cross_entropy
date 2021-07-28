@@ -6,14 +6,16 @@ from src.train import *
 from src.data import *
 from src.evaluate import *
 from src.active_learning import *
-from softtriple_train import adjust_learning_rate
+from softtriple_train import adjust_learning_rate, proxy_similarity
 import argparse
 
 def run(cfg: Dict, 
         loaders: MetricLoaders, 
         recall_ks: List[int], 
         model: nn.Module,
-        logger) -> None:
+        logger, 
+        iteration: int,
+        writer) -> None:
     """
         Main model training logic
     """
@@ -31,12 +33,14 @@ def run(cfg: Dict,
     class_loss = SoftTriple(cfg['Train']['la'], cfg['Train']['gamma'], cfg['Train']['tau'], 
                            cfg['Train']['margin'], cfg['MODEL']['num_features'], 
                            loaders.num_classes, cfg['Train']['K'])
-    # initialize proxies
-    all_gallery_feat, all_gallery_labels, _ = feature_extractor(model, loaders.train_noshuffle, loaders.labeldict)
-    class_loss.proxy_initialize(all_gallery_feat, all_gallery_labels)
-    class_loss = class_loss.to(device)
-    print('Finish proxy initialization')
-    logger.info('Finish proxy initialization')
+    
+    if cfg['Train']['proxy_initialize']:
+        # initialize proxies
+        all_gallery_feat, all_gallery_labels, _ = feature_extractor(model, loaders.train_noshuffle, loaders.labeldict)
+        class_loss.proxy_initialize(all_gallery_feat, all_gallery_labels)
+        class_loss = class_loss.to(device)
+        print('Finish proxy initialization')
+        logger.info('Finish proxy initialization')
     
     optimizer = torch.optim.Adam([{"params": model.parameters(), "lr": cfg['Train']['modellr']},
                                   {"params": criterion.parameters(), "lr": cfg['Train']['centerlr']}],
@@ -56,7 +60,12 @@ def run(cfg: Dict,
                   scheduler=scheduler, 
                   epoch=epoch, 
                   logger=logger)
-
+        
+    
+    measure = proxy_similarity(class_loss)
+    if criterion.K > 1:
+        writer.add_histogram('Proxy intersimilarity', measure, iteration)
+    
     # saving
     save_name = os.path.join(temp_dir, "{}_{}.pt".format(cfg["MODEL"]["arch"], cfg["DATA"]["Name"]))
     torch.save(model.state_dict(), save_name)
@@ -71,6 +80,7 @@ def al_loop(args) -> None:
     """
     
     os.makedirs("log", exist_ok=True)
+    writer = SummaryWriter('runs/{}_{}_al'.format(cfg["MODEL"]["arch"], cfg['DATA']['Name']))
 
     ### initial model trained on initial training set ##### 
     with open(args.config_file) as file:
@@ -119,7 +129,14 @@ def al_loop(args) -> None:
         matching_acc, avg_tp, avg_fp, avg_tn, avg_fn = evaluator_aggregate(model=cur_model, loaders=loaders, recall_ks=recall_ks)
         print("Avg Testing matching Acc at current iteration = {}, Avg TPs = {}, Avg FPs = {}, Avg TNs = {}, Avg FNs = {}".format(matching_acc, avg_tp, avg_fp, avg_tn, avg_fn))
         logger.info("Avg Testing matching Acc at current iteration = {}, Avg TPs = {}, Avg FPs = {}, Avg TNs = {}, Avg FNs = {}".format(matching_acc, avg_tp, avg_fp, avg_tn, avg_fn))
-
+        
+        writer.add_scalar('Training size', training_size, it)
+        writer.add_scalar('Pool size', pool_size, it)
+        writer.add_scalar('Test size', test_size, it)
+        writer.add_scalar('Number of classes selected', loaders.num_classes, it)
+        writer.add_scalar('Number of instances selected', sampled_size, it)
+        writer.add_scalar('Avg testing matching acc', matching_acc, it)
+        
         # limited budget
         if sampled_size >= training_size or sampled_size >= pool_size * 0.9:
             break
@@ -134,7 +151,9 @@ def al_loop(args) -> None:
         best_f1, best_threshold = threshold_finder(model=cur_model, loaders=loaders)
         print("Best f1 score = {} @ threshold = {}".format(best_f1, best_threshold))
         logger.info("Best f1 score = {} @ threshold = {}".format(best_f1, best_threshold))
-
+        
+        writer.add_scalar('Selected best threshold', best_threshold, it)
+        
         # AL selector
         selected_indices, S = selector(all_gallery_features, all_gallery_labels, 
                                        all_pool_features, all_pool_labels, 
@@ -157,6 +176,12 @@ def al_loop(args) -> None:
         logger.info("Total # of instances selected = {}, # selected FNs at current iteration = {} out of total {} FNs, # selected FPs at current iteration = {} out of total {} FPs".format(len(selected_samples), 
                                                           fn_selected, total_fn, 
                                                           fp_selected, total_fp))
+        
+        writer.add_scalar('# FN selected / total # of selected', fn_selected/len(selected_samples), it)
+        writer.add_scalar('# FP selected / total # of selected', fp_selected/len(selected_samples), it)
+        writer.add_scalar('# FN selected / total # of # FN', fn_selected/total_fn, it)
+        writer.add_scalar('# FP selected / total # of # FP', fp_selected/total_fp, it)
+        writer.add_scalar('# FP selected / # FN selected', fp_selected/fn_selected, it)
 
         # update after AL
         # update original data file
@@ -199,7 +224,7 @@ def al_loop(args) -> None:
         cur_model = nn.DataParallel(cur_model)
 
         # retrain the model!
-        cur_model = run(cfg=cur_cfg, loaders=loaders, recall_ks=recall_ks, model=cur_model, logger=logger)
+        cur_model = run(cfg=cur_cfg, loaders=loaders, recall_ks=recall_ks, model=cur_model, logger=logger, iteration=it, writer=writer)
 
         
 def argparser() -> argparse.ArgumentParser:

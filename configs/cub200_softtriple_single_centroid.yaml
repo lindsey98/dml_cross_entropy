@@ -2,8 +2,8 @@ DATA:
     Name: 'cub_single_c'
     Path:
         data_path: 'data/CUB_200_2011'
-        train_file: 'train_small.txt'
-        test_file: 'test_new.txt'
+        train_file: 'train.txt'
+        test_file: 'test.txt'
         pool_file: 'pool.txt'
 
     Sampler:
@@ -54,7 +54,7 @@ Train:
     tau: 0.2
     margin: 0.01
     K: 1
-
+    proxy_initialize: True
     
 MODEL:
     arch: 'bninception'
@@ -64,7 +64,7 @@ MODEL:
     norm_layer: None  # use a normalization layer (batchnorm or layernorm) for the features
     remap: False  # remap features through a linear layer
     detach: False  # detach features before feeding to the classification layer. Prevents training of the feature extractor with cross-entropy.
-    normalize: False  # normalize the features
+    normalize: True  # normalize the features
     set_bn_eval: True  # set bn in eval mode even in training
     normalize_weight: False  # normalize the weights of the classification layer
     

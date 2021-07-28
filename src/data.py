@@ -22,7 +22,12 @@ import logging
 import yaml
 import faiss
 from typing import Tuple, List
+from PIL import Image
 
+def RGB2BGR(im):
+    assert im.mode == 'RGB'
+    r, g, b = im.split()
+    return Image.merge('RGB', (b, g, r))
 
 def get_transforms(crop_size: int, scale: Tuple[float], ratio: Tuple[float], 
                    resize=None, rotate=None, color_jitter=None) -> (transforms.Compose, transforms.Compose):
@@ -30,22 +35,40 @@ def get_transforms(crop_size: int, scale: Tuple[float], ratio: Tuple[float],
         Return list of transformations applied on training and testing
     '''
     train_transform, test_transform = [], []
-    if resize is not None:
-        test_transform.append(transforms.Resize(resize))
-        train_transform.append(transforms.Resize(resize))
+    #     SoftTriple use the following transformations 
+    normalize = transforms.Normalize(mean=[104., 117., 128.],
+                                     std=[1., 1., 1.])
+#     if resize is not None:
+#         test_transform.append(transforms.Resize(resize))
+#         train_transform.append(transforms.Resize(resize))
         
-    if rotate is not None:
-        train_transform.append(transforms.RandomRotation(rotate))
+#     if rotate is not None:
+#         train_transform.append(transforms.RandomRotation(rotate))
         
-    if color_jitter is not None:
-        train_transform.append(transforms.ColorJitter(color_jitter))
+#     if color_jitter is not None:
+#         train_transform.append(transforms.ColorJitter(color_jitter))
         
-    train_transform.extend([transforms.RandomResizedCrop(size=crop_size, scale=scale, ratio=ratio),
-                            transforms.RandomHorizontalFlip(),
-                            transforms.ToTensor()])
+#     train_transform.extend([transforms.RandomResizedCrop(size=crop_size, scale=scale, ratio=ratio),
+#                             transforms.RandomHorizontalFlip(),
+#                             transforms.ToTensor()])
 
-    test_transform.extend([transforms.CenterCrop(size=crop_size),
-                           transforms.ToTensor()])
+#     test_transform.extend([transforms.CenterCrop(size=crop_size),
+#                            transforms.ToTensor()])
+
+    train_transform.extend([transforms.Lambda(RGB2BGR),
+                            transforms.RandomResizedCrop(224),
+                            transforms.RandomHorizontalFlip(),
+                            transforms.ToTensor(),
+                            transforms.Lambda(lambda x: x.mul(255)),
+                            normalize])
+
+    test_transform.extend([transforms.Lambda(RGB2BGR),
+                            transforms.Resize(256),
+                            transforms.CenterCrop(224),
+                            transforms.ToTensor(),
+                            transforms.Lambda(lambda x: x.mul(255)),
+                            normalize])
+
 
     return transforms.Compose(train_transform), transforms.Compose(test_transform)
 

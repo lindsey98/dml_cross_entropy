@@ -7,6 +7,7 @@ from torch.nn.parameter import Parameter
 from torch.nn import init
 from tqdm import tqdm
 from sklearn.cluster import KMeans
+import math
 
 
 def state_dict_to_cpu(state_dict: OrderedDict):
@@ -106,6 +107,9 @@ class SoftTriple(nn.Module):
         for i in range(0, cN): 
             for j in range(0, K):
                 self.weight[i*K+j, i*K+j+1:(i+1)*K] = 1
+                
+        init.kaiming_uniform_(self.fc, a=math.sqrt(5))
+        
         return
     
     def proxy_initialize(self, gallery_feat: torch.Tensor, gallery_labels: torch.Tensor):

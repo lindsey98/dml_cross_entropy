@@ -54,7 +54,7 @@ Train:
     tau: 0.2
     margin: 0.01
     K: 1
-
+    proxy_initialize: True
     
 MODEL:
     arch: 'bninception'

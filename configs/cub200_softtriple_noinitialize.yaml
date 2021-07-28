@@ -1,7 +1,7 @@
 DATA:
-    Name: 'cars'
+    Name: 'cub_noinitialize'
     Path:
-        data_path: 'data/CARS_196'
+        data_path: 'data/CUB_200_2011'
         train_file: 'train.txt'
         test_file: 'test.txt'
         pool_file: 'pool.txt'
@@ -28,7 +28,7 @@ DATA:
 Train:
     epochs: 50
     modellr: 0.0001
-    centerlr: 0.01
+    centerlr: 0.001
     momentum: 0.
     nesterov: False
     weight_decay: 0.0001
@@ -54,7 +54,7 @@ Train:
     tau: 0.2
     margin: 0.01
     K: 10
-    proxy_initialize: True
+    proxy_initialize: False
 
     
 MODEL:

@@ -57,8 +57,7 @@ def main(args):
     model = nn.DataParallel(model)
     
     # define loss function (criterion) and optimizer TODO
-    criterion = 
-    
+    criterion = SmoothCrossEntropy(epsilon=cfg['Train']['label_smoothing'])
     
     # define optimizer, model parameters and proxy weights are using different learning rate, proxy learning rate is higher, because model weights are pretrained needs lower learning rate
     optimizer = torch.optim.Adam("params": model.parameters(), lr = cfg['Train']['modellr'],
@@ -94,26 +93,11 @@ def main(args):
     recalls = validate(loaders.query, model, loaders.labeldict)
     print('Recall@1, 2, 4, 8: {recall[1]:.3f}, {recall[2]:.3f}, {recall[4]:.3f}, {recall[8]:.3f} \n'.format(recall=recalls))
     logger.info('Recall@1, 2, 4, 8: {recall[1]:.3f}, {recall[2]:.3f}, {recall[4]:.3f}, {recall[8]:.3f}'.format(recall=recalls))
+    # saving
+    save_name = os.path.join(cfg['Train']['temp_dir'], "{}_{}.pt".format(cfg["MODEL"]["arch"], 
+                                                                         cfg["DATA"]["Name"]))
+    torch.save(model.state_dict(), save_name)
 
-
-def validate(test_loader: DataLoader, 
-             model: nn.Module, 
-             labeldict: Dict) -> Dict:
-    '''
-        Switch to evaluation mode
-    '''
-    device = next(model.parameters()).device
-    model.eval()
-
-    testdata, testlabel, _ = feature_extractor(model=model, 
-                                              loaders=test_loader,
-                                              labeldict=labeldict)
-    
-    recalls = recall_at_ks(query_features=testdata.to(device),
-                          query_labels=testlabel.to(device),
-                          ks=[1,2,4,8],
-                          cosine=True)
-    return recalls
 
 
 def adjust_learning_rate(optimizer: Optimizer, epoch: int, cfg: Dict) -> None:
