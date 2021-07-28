@@ -1,7 +1,7 @@
 from PIL import Image
 from torch.utils.data import Dataset
 
-from utils.data.utils import load_data
+from src.data_utils.utils import load_data
 
 
 class ImageDataset(Dataset):

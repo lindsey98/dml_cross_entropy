@@ -27,9 +27,111 @@ import yaml
 import faiss
 import numpy as np
 
+from sklearn.cluster import KMeans
+from sklearn.metrics.cluster import normalized_mutual_info_score
+import numpy as np
+
+
+# def nmi_recall_evaluator(X: np.ndarray, 
+#                          Y: np.ndarray, 
+#                          Kset: np.ndarray) -> (float, List[float]):
+#     '''
+#         Evaluate NMI between clustering assignment and true labels
+#         Evaluate Recall@K on a set of K (Kset)
+#     '''
+#     nmi = None
+#     num = X.shape[0] # N
+#     classN = np.max(Y)+1 # Number of classes
+#     kmax = np.max(Kset) # Maximum number of NN we look at
+#     recallK = np.zeros(len(Kset))
+#     #compute NMI
+#     kmeans = KMeans(n_clusters=classN).fit(X)
+#     nmi = normalized_mutual_info_score(Y, kmeans.labels_, average_method='arithmetic')
+    #How mutual information is calculated? I(X, Y) = \int_x \int_y {p(x,y) * log(p(x,y)/(p(x)p(y)))}
+    #If X, Y are two sets then I(X, Y) = \sum_i \sum_j {|U_i intersect U_j|/N * log(N|U_i intersect U_j|/|U_i||U_j|))}
+    
+    #compute Recall@K: count if at least one of its K neighbors are correct
+#     sim = X.dot(X.T)
+#     minval = np.min(sim) - 1.
+#     sim -= np.diag(np.diag(sim))
+#     sim += np.diag(np.ones(num) * minval)
+#     indices = np.argsort(-sim, axis=1)[:, : kmax] # sort according to similarity
+#     YNN = Y[indices]
+#     for i in range(0, len(Kset)):
+#         pos = 0.
+#         for j in range(0, num):
+#             if Y[j] in YNN[j, :Kset[i]]:
+#                 pos += 1. # at least 1 NN is correct
+#         recallK[i] = pos/num 
+#     return nmi, recallK
+
+@torch.no_grad()
+def recall_at_ks(query_features: torch.Tensor,
+                 query_labels: torch.LongTensor,
+                 ks: List[int],
+                 gallery_features: Optional[torch.Tensor] = None,
+                 gallery_labels: Optional[torch.Tensor] = None,
+                 cosine: bool = False) -> Dict[int, float]:
+    """
+    Compute the recall between samples at each k. This function uses about 8GB of memory.
+
+    Parameters
+    ----------
+    query_features : torch.Tensor
+        Features for each query sample. shape: (num_queries, num_features)
+    query_labels : torch.LongTensor
+        Labels corresponding to the query features. shape: (num_queries,)
+    ks : List[int]
+        Values at which to compute the recall.
+    gallery_features : torch.Tensor
+        Features for each gallery sample. shape: (num_queries, num_features)
+    gallery_labels : torch.LongTensor
+        Labels corresponding to the gallery features. shape: (num_queries,)
+    cosine : bool
+        Use cosine distance between samples instead of euclidean distance.
+
+    Returns
+    -------
+    recalls : Dict[int, float]
+        Values of the recall at each k.
+
+    """
+    offset = 0
+    if gallery_features is None and gallery_labels is None:
+        offset = 1
+        gallery_features = query_features
+        gallery_labels = query_labels
+    elif gallery_features is None or gallery_labels is None:
+        raise ValueError('gallery_features and gallery_labels needs to be both None or both Tensors.')
+
+    if cosine:
+        query_features = F.normalize(query_features, p=2, dim=1)
+        gallery_features = F.normalize(gallery_features, p=2, dim=1)
+
+    to_cpu_numpy = lambda x: x.cpu().numpy()
+    q_f, q_l, g_f, g_l = map(to_cpu_numpy, [query_features, query_labels, gallery_features, gallery_labels])
+
+    res = faiss.StandardGpuResources()
+    flat_config = faiss.GpuIndexFlatConfig()
+    flat_config.device = 0
+
+    max_k = max(ks)
+    index_function = faiss.GpuIndexFlatIP if cosine else faiss.GpuIndexFlatL2
+    index = index_function(res, g_f.shape[1], flat_config)
+    index.add(g_f)
+    closest_indices = index.search(q_f, max_k + offset)[1]
+
+    recalls = {}
+    for k in ks:
+        indices = closest_indices[:, offset:k + offset]
+        recalls[k] = (q_l[:, None] == g_l[indices]).any(1).mean()
+    return {k: round(v * 100, 2) for k, v in recalls.items()}
+
+
 @torch.no_grad()
 def feature_extractor(model: nn.Module, 
-                      loaders: MetricLoaders) -> (torch.Tensor, torch.Tensor, List):
+                      loaders: DataLoader,
+                      labeldict: Dict) -> (torch.Tensor, torch.Tensor, List):
     '''
       Extract feature embeddings given a DataLoader
     '''
@@ -40,9 +142,9 @@ def feature_extractor(model: nn.Module,
 
     with torch.no_grad():
         for batch, labels, _ in tqdm(loaders, desc='Extracting features', leave=False, ncols=80):
+            labels = torch.tensor([labeldict[x] for x in labels.numpy()])
             batch, labels = batch.to(device), labels.to(device)
             logits, features = model(batch)
-
             all_query_labels.append(labels)
             all_query_features.append(features)
 
@@ -50,10 +152,15 @@ def feature_extractor(model: nn.Module,
     all_query_labels = torch.cat(all_query_labels, 0)
     all_query_features = torch.cat(all_query_features, 0)
     all_query_samples = loaders.dataset.samples
+    print(len(all_query_labels))
+    print(len(all_query_features))
+    print(len(all_query_samples))
     
     assert len(all_query_features) == len(all_query_labels) == len(all_query_samples)
     
     return all_query_features.detach().cpu(), all_query_labels.detach().cpu(), all_query_samples
+
+
 
 def evaluator(query_features: torch.Tensor,
               query_labels: torch.Tensor,
@@ -155,8 +262,10 @@ def fpfn_extractor(query_features: torch.Tensor,
     assert (len(fn) == len(q_l)) & (len(fp) == len(q_l))
     fn_indices = np.where(fn == True)[0]
     fp_indices = np.where(fp == True)[0]
+    tn_indices = np.where(tn == True)[0]
+    tp_indices = np.where(tp == True)[0]
         
-    return fn_indices, fp_indices
+    return fn_indices, fp_indices, tn_indices, tp_indices
 
 @torch.no_grad()
 def evaluator_aggregate(model: nn.Module, 
@@ -167,8 +276,12 @@ def evaluator_aggregate(model: nn.Module,
         Aggregate evaluation results over multiple thresholds and multiple k
     '''        
     
-    gallery_features, gallery_labels, _ = feature_extractor(model=model, loaders=loaders.train_noshuffle)
-    query_features, query_labels, _ = feature_extractor(model=model, loaders=loaders.query)
+    gallery_features, gallery_labels, _ = feature_extractor(model=model, 
+                                                            loaders=loaders.train_noshuffle, 
+                                                            labeldict=loaders.labeldict)
+    query_features, query_labels, _ = feature_extractor(model=model, 
+                                                        loaders=loaders.query, 
+                                                        labeldict=loaders.labeldict)
     
     # Evaluate
     eval_function = partial(evaluator, query_features=query_features, 
@@ -219,11 +332,15 @@ def evaluator_selector(model: nn.Module,
         Evaluator for selector on unlabelled pool set
         Record how many FPs FNs are inside the selected indices
     '''
-    gallery_features, gallery_labels, _ = feature_extractor(model=model, loaders=loaders.train_noshuffle)
-    pool_features, pool_labels, _ = feature_extractor(model=model, loaders=loaders.pool)
+    gallery_features, gallery_labels, _ = feature_extractor(model=model, 
+                                                            loaders=loaders.train_noshuffle, 
+                                                            labeldict=loaders.labeldict)
+    pool_features, pool_labels, _ = feature_extractor(model=model, 
+                                                      loaders=loaders.pool, 
+                                                      labeldict=loaders.labeldict)
     
     # Evaluate
-    fn_indices, fp_indices = fpfn_extractor(query_features=pool_features, 
+    fn_indices, fp_indices, _, _ = fpfn_extractor(query_features=pool_features, 
                                             query_labels=pool_labels,
                                             gallery_features=gallery_features,
                                             gallery_labels=gallery_labels,
@@ -247,7 +364,9 @@ def threshold_finder(model: nn.Module,
         Decide which matching threshold is the best using gallery/training set only
     '''
     
-    gallery_features, gallery_labels, _ = feature_extractor(model=model, loaders=loaders.train_noshuffle)
+    gallery_features, gallery_labels, _ = feature_extractor(model=model, 
+                                                            loaders=loaders.train_noshuffle, 
+                                                            labeldict=loaders.labeldict)
 
     # Get number of TPs, FPs, FNs, TNs(0 in this case cuz all classes are seen)
     best_f1 = 0

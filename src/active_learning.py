@@ -36,6 +36,8 @@ def selector(all_gallery_features: torch.Tensor, all_gallery_labels: torch.Tenso
     '''
        AL unlabelled selector 
     '''
+    all_gallery_features = F.normalize(all_gallery_features, p=2, dim=1)
+    
     # empirical estimate of p(y) estimated from training set
     (unique, counts) = np.unique(all_gallery_labels, return_counts=True)
 
@@ -98,6 +100,27 @@ def selector(all_gallery_features: torch.Tensor, all_gallery_labels: torch.Tenso
         entropy = torch.sum(-prob*torch.log2(prob), dim=1).numpy()
         selected_indices = entropy.argsort()[::-1][:selected_k] # those data points that are uncertain
         return selected_indices, entropy
+    
+    elif strategy == 'topology':
+        intra_temp = 1000 # temperature smoothing 
+        inter_temp = 0.1 # temperature smoothing 
+        
+        query_features = F.normalize(all_pool_features, p=2, dim=1)
+        dist = torch.mm(query_features, all_gallery_features.T) # of shape N_pool x N_gallery
+
+        all_intra_sum = torch.tensor([]) # weighted average of gallery set from a specific class of shape N_pool x C
+        for cls in unique: # for each class in gallery set
+            clsind = np.where(all_gallery_labels == cls)[0] # get corresponding indices
+            intra_cls_prob = F.softmax(dist[:, clsind] / intra_temp, dim=1) # intra-class weights
+            intra_cls_sum = torch.sum(intra_cls_prob * dist[:, clsind], dim=1) # intra-class weighted avg of similarity
+            all_intra_sum = torch.cat((all_intra_sum, intra_cls_sum.unsqueeze(-1)), dim=-1) 
+
+        inter_cls_prob = F.softmax(dist / inter_temp, dim=1)
+        all_inter_sum = torch.sum(inter_cls_prob * dist, dim=1) # weighted avg to all gallery set, of shape N_pool
+
+        derivative_proxy = torch.max(all_intra_sum, dim=1)[0] - all_inter_sum
+        selected_indices = derivative_proxy.argsort()[:selected_k] # those data points that are uncertain
+        return selected_indices, derivative_proxy
     
     elif strategy == 'random':
         selected_indices = np.random.choice(len(all_pool_features), selected_k, replace=False)

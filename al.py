@@ -6,6 +6,7 @@ from src.train import *
 from src.data import *
 from src.evaluate import *
 from src.active_learning import *
+from softtriple_train import adjust_learning_rate
 import argparse
 
 def run(cfg: Dict, 
@@ -26,21 +27,28 @@ def run(cfg: Dict,
     
     os.makedirs(temp_dir, exist_ok=True)
 
-    class_loss = SmoothCrossEntropy(epsilon=label_smoothing) # get loss
-
-    parameters = []
-    if no_bias_decay:
-        parameters.append({"params": [par for par in model.parameters() if par.dim() != 1]})
-        parameters.append({"params": [par for par in model.parameters() if par.dim() == 1], "weight_decay": 0})
-    else:
-        parameters.append({"params": model.parameters()})
-    optimizer, scheduler = get_optimizer_scheduler(cfg=cfg, parameters=parameters, 
-                                                   loader_length=len(loaders.train))
-
+    device = next(model.parameters()).device
+    class_loss = SoftTriple(cfg['Train']['la'], cfg['Train']['gamma'], cfg['Train']['tau'], 
+                           cfg['Train']['margin'], cfg['MODEL']['num_features'], 
+                           loaders.num_classes, cfg['Train']['K'])
+    # initialize proxies
+    all_gallery_feat, all_gallery_labels, _ = feature_extractor(model, loaders.train_noshuffle, loaders.labeldict)
+    class_loss.proxy_initialize(all_gallery_feat, all_gallery_labels)
+    class_loss = class_loss.to(device)
+    print('Finish proxy initialization')
+    logger.info('Finish proxy initialization')
+    
+    optimizer = torch.optim.Adam([{"params": model.parameters(), "lr": cfg['Train']['modellr']},
+                                  {"params": criterion.parameters(), "lr": cfg['Train']['centerlr']}],
+                                     eps=cfg['Train']['eps'], weight_decay = cfg['Train']['weight_decay'])
+    scheduler = None
+    
     torch.manual_seed(seed)
     for epoch in range(epochs):
+        print('Training in Epoch[{}]'.format(epoch))
+        adjust_learning_rate(optimizer, epoch, cfg) 
 
-        model=training(model=model, 
+        training(model=model, 
                   labeldict=loaders.labeldict, 
                   loader=loaders.train, 
                   class_loss=class_loss, 
@@ -131,7 +139,7 @@ def al_loop(args) -> None:
         selected_indices, S = selector(all_gallery_features, all_gallery_labels, 
                                        all_pool_features, all_pool_labels, 
                                        strategy = al_strategy, 
-                                       selected_k = int(0.1*training_size),
+                                       selected_k = int(0.05*training_size),
                                        threshold = best_threshold)
 
         selected_samples = np.asarray(all_pool_samples)[selected_indices]
@@ -173,7 +181,7 @@ def al_loop(args) -> None:
         # update cfg
         cur_cfg["DATA"]["Path"]["train_file"] = new_train_file
         cur_cfg["DATA"]["Path"]["pool_file"] = new_pool_file
-        cur_cfg["DATA"]["Name"] = "cub_it{}_{}".format(it, al_strategy)
+        cur_cfg["DATA"]["Name"] = "{}_it{}_{}".format(exp_name, it, al_strategy)
         logger.info(cur_cfg)
 
         # update dataloader, update model

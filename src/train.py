@@ -13,7 +13,7 @@ from torch.optim import SGD, lr_scheduler
 
 from src.utils import state_dict_to_cpu, SmoothCrossEntropy
 from torch.utils.data import DataLoader
-from typing import NamedTuple, Optional, Dict, List, Any
+from typing import NamedTuple, Optional, Dict, List, Any, Union
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 from torchvision import transforms
@@ -58,7 +58,7 @@ def get_optimizer_scheduler(cfg: Dict, parameters: Dict, loader_length: int) -> 
 
 def training(model: nn.Module, loader: DataLoader,
           labeldict: Dict, class_loss: nn.Module,
-          optimizer: Optimizer, scheduler: _LRScheduler,
+          optimizer: Optimizer, scheduler: Union[_LRScheduler, None],
           epoch: int, 
           logger) -> nn.Module:
     '''
@@ -76,12 +76,14 @@ def training(model: nn.Module, loader: DataLoader,
         labels = torch.tensor([labeldict[x] for x in labels.numpy()])
         batch, labels, indices = map(to_device, (batch, labels, indices))
         logits, features = model(batch)
-        loss = class_loss(logits, labels).mean()
+#         loss = class_loss(logits, labels).mean() # Mutual information loss uses CE loss requires logits
+        loss = class_loss(features, labels) # SoftTripleLoss does not look at logits
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        scheduler.step()
+        if scheduler is not None:
+            scheduler.step()
 
         train_losses.append(loss)
     
@@ -89,3 +91,5 @@ def training(model: nn.Module, loader: DataLoader,
         
 
     return model
+
+

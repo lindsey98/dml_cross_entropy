@@ -57,6 +57,7 @@ class BaseModel(nn.Module):
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         features = self.feature_extractor(x)
+        features = features.view(features.size(0), -1)
         features = self.norm_layer(features)
         features = self.remap(features)
 

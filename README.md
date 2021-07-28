@@ -54,6 +54,11 @@ In-Shop
 python experiment.py with dataset.inshop model.resnet50 epochs=100 lr=0.003 momentum=0.99 nesterov=True model.norm_layer=batch
 ```
 
+Logo2k
+```bash
+python experiment.py with dataset.logo2k model.resnet50 epochs=100 lr=0.02
+```
+
 ## To train AE
 CUB200
 ```bash
