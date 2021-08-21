@@ -13,7 +13,7 @@ ex1 = Experiment('Prepare CUB')
 @ex1.config
 def config():
     cub_dir = path.join('data', 'CUB_200_2011')
-    cub_url = 'http://www.vision.caltech.edu.s3-us-west-2.amazonaws.com/visipedia-data/CUB-200-2011/CUB_200_2011.tgz'
+    cub_url = 'data/CUB_200_2011.tar'
     images_file = 'images.txt'
     train_file = 'train.txt'
     test_file = 'test.txt'
@@ -21,9 +21,10 @@ def config():
 
 @ex1.capture
 def download_extract_cub(cub_dir, cub_url):
-    download_url(cub_url, root=path.dirname(cub_dir))
-    filename = path.join(path.dirname(cub_dir), path.basename(cub_url))
-    with tarfile.open(filename, 'r:gz') as tar:
+#     download_url(cub_url, root=path.dirname(cub_dir))
+#     filename = path.join(path.dirname(cub_dir), path.basename(cub_url))
+    filename = cub_url
+    with tarfile.open(filename, 'r') as tar:
         tar.extractall(path=path.dirname(cub_dir))
 
 
@@ -65,8 +66,8 @@ ex2 = Experiment('Prepare CARS-196')
 @ex2.config
 def config():
     cars_dir = path.join('data', 'CARS_196')
-    cars_url = 'http://imagenet.stanford.edu/internal/car196/car_ims.tgz'
-    cars_annotations_url = 'http://imagenet.stanford.edu/internal/car196/cars_annos.mat'
+    cars_url = 'http://ai.stanford.edu/~jkrause/car196/car_ims.tgz'
+    cars_annotations_url = 'http://ai.stanford.edu/~jkrause/car196/cars_annos.mat'
     train_file = 'train.txt'
     test_file = 'test.txt'
 
@@ -209,6 +210,6 @@ def generate_inshop_train_test(inshop_dir, train_file, test_query_file, test_gal
 if __name__ == '__main__':
     os.makedirs('data', exist_ok=True)
     ex1.run()
-    ex2.run()
-    ex3.run()
-    ex4.run()
+#     ex2.run()
+#     ex3.run()
+#     ex4.run()

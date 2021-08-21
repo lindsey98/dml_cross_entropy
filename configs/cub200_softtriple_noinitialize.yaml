@@ -1,0 +1,71 @@
+DATA:
+    Name: 'cub_noinitialize'
+    Path:
+        data_path: 'data/CUB_200_2011'
+        train_file: 'train.txt'
+        test_file: 'test.txt'
+        pool_file: 'pool.txt'
+
+    Sampler:
+        batch_size: 32
+        test_batch_size: 128
+        sampler: 'random'
+        preload: False  # load all images into RAM to avoid IO
+        num_workers: 8  # number of workers used ot load the data
+        pin_memory: False  # use the pin_memory option of DataLoader
+        num_iterations: null
+        num_identities: null
+        
+    Aug:
+        crop_size: 224
+        scale: (0.16, 1)
+        ratio: (1., 1.)
+        recalls: [1, 3, 5, 10]
+        resize: 256
+        rotate: null
+        color_jitter: null
+        
+Train:
+    epochs: 50
+    modellr: 0.0001
+    centerlr: 0.001
+    momentum: 0.
+    nesterov: False
+    weight_decay: 0.0001
+    scheduler: 'warmcos'
+
+    visdom_port: None
+    visdom_freq: 20
+    cpu: False  # Force training on CPU
+    cudnn_flag: 'benchmark'
+    temp_dir: 'checkpoints'
+
+    no_bias_decay: True
+    label_smoothing: 0.1
+    
+    lr_step: null
+    seed: 1234
+    
+    eps: 0.01
+    rate: 0.1
+    freeze_BN: True
+    la: 20
+    gamma: 0.1
+    tau: 0.2
+    margin: 0.01
+    K: 10
+    proxy_initialize: False
+
+    
+MODEL:
+    arch: 'bninception'
+    num_features: 64
+    dropout: 0.5
+    pretrained: True  # use a pretrained model from torchvision
+    norm_layer: None  # use a normalization layer (batchnorm or layernorm) for the features
+    remap: False  # remap features through a linear layer
+    detach: False  # detach features before feeding to the classification layer. Prevents training of the feature extractor with cross-entropy.
+    normalize: True  # normalize the features
+    set_bn_eval: True  # set bn in eval mode even in training
+    normalize_weight: False  # normalize the weights of the classification layer
+    

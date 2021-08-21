@@ -38,7 +38,7 @@ def config():
     visdom_freq = 20
     cpu = False  # Force training on CPU
     cudnn_flag = 'benchmark'
-    temp_dir = tempfile.gettempdir()
+    temp_dir = 'checkpoints'
 
     no_bias_decay = True
     label_smoothing = 0.1
@@ -69,6 +69,7 @@ def get_optimizer_scheduler(parameters, loader_length, epochs, lr, momentum, nes
 
 @ex.automain
 def main(epochs, cpu, cudnn_flag, visdom_port, visdom_freq, temp_dir, seed, no_bias_decay, label_smoothing):
+    os.makedirs(temp_dir, exist_ok=True)
     device = torch.device('cuda:0' if torch.cuda.is_available() and not cpu else 'cpu')
     callback = VisdomLogger(port=visdom_port) if visdom_port else None
     if cudnn_flag == 'deterministic':
@@ -96,6 +97,8 @@ def main(epochs, cpu, cudnn_flag, visdom_port, visdom_freq, temp_dir, seed, no_b
     # setup partial function to simplify call
     eval_function = partial(evaluate, model=model, recall=recall_ks, query_loader=loaders.query,
                             gallery_loader=loaders.gallery)
+    print(len(loaders.train.dataset))
+    print(len(loaders.query.dataset))
 
     # setup best validation logger
     metrics = eval_function()
@@ -110,7 +113,7 @@ def main(epochs, cpu, cudnn_flag, visdom_port, visdom_freq, temp_dir, seed, no_b
         if cudnn_flag == 'benchmark':
             setattr(cudnn, cudnn_flag, True)
 
-        train(model=model, loader=loaders.train, class_loss=class_loss, optimizer=optimizer,
+        train(model=model, labeldict=loaders.labeldict, loader=loaders.train, class_loss=class_loss, optimizer=optimizer,
               scheduler=scheduler, epoch=epoch, callback=callback, freq=visdom_freq, ex=ex)
 
         # validation

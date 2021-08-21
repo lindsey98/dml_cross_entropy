@@ -44,7 +44,6 @@ class AverageMeter:
             self.last_counter = 0
             return self.latest_avg
 
-
 @torch.no_grad()
 def recall_at_ks(query_features: torch.Tensor,
                  query_labels: torch.LongTensor,
@@ -265,5 +264,6 @@ def fp_fn_eval(query_features: torch.Tensor,
     fps = ((q_l[:, None] != g_l[indices]) * (distances[:, offset:max_k + offset] >= threshold)).any(1) # 1st neighbor is close but not having the same class label
          
     return fns, fps
+
 
 
