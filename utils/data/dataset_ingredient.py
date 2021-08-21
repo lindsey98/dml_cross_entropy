@@ -7,6 +7,7 @@ from torchvision import transforms
 
 from .image_dataset import ImageDataset
 from .utils import RandomReplacedIdentitySampler
+from PIL import Image
 
 data_ingredient = Ingredient('dataset')
 
@@ -17,7 +18,7 @@ def config():
     test_file = 'test.txt'
 
     batch_size = 128
-    test_batch_size = 256
+    test_batch_size = 128
     sampler = 'random'
 
     preload = False  # load all images into RAM to avoid IO
@@ -28,7 +29,7 @@ def config():
     scale = (0.16, 1)
     ratio = (3. / 4., 4. / 3.)
 
-    recalls = [1, 2, 4, 8, 16, 32]
+    recalls = [1, 2, 4, 8]
 
 
 @data_ingredient.named_config
@@ -45,7 +46,7 @@ def cars():
     data_path = 'data/CARS_196'
     resize = (256, 256)
     color_jitter = (0.3, 0.3, 0.3, 0.1)
-    ratio = (1, 1)
+    ratio = (1., 1.)
 
 
 @data_ingredient.named_config
@@ -53,7 +54,6 @@ def sop():
     name = 'sop'
     data_path = 'data/Stanford_Online_Products'
     resize = (256, 256)
-    recalls = [1, 10, 100, 1000]
 
 
 @data_ingredient.named_config
@@ -61,7 +61,17 @@ def inshop():
     name = 'inshop'
     test_file = ('test_query.txt', 'test_gallery.txt')
     data_path = 'data/InShop'
-    recalls = [1, 10, 20, 30, 40, 50]
+    
+@data_ingredient.named_config
+def logo2k():
+    name = 'inshop'
+    data_path = 'data/logo2k-data'
+    resize = (256, 256)
+
+def RGB2BGR(im):
+    assert im.mode == 'RGB'
+    r, g, b = im.split()
+    return Image.merge('RGB', (b, g, r))
 
 
 @data_ingredient.capture
@@ -80,7 +90,7 @@ def get_transforms(crop_size, scale, ratio, resize=None, rotate=None, color_jitt
 
     test_transform.extend([transforms.CenterCrop(size=crop_size),
                            transforms.ToTensor()])
-
+    
     return transforms.Compose(train_transform), transforms.Compose(test_transform)
 
 

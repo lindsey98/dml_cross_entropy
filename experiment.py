@@ -27,12 +27,12 @@ ex.captured_out_filter = apply_backspaces_and_linefeeds
 
 @ex.config
 def config():
-    epochs = 20
+    epochs = 50
     lr = 0.02
     momentum = 0.
     nesterov = False
-    weight_decay = 5e-4
-    scheduler = 'warmcos'
+    weight_decay = 5e-4 # FIXME: weight_decay is different
+    scheduler = 'warmcos' # FIXME: scheduler is different
 
     visdom_port = None
     visdom_freq = 20
@@ -49,6 +49,7 @@ def get_optimizer_scheduler(parameters, loader_length, epochs, lr, momentum, nes
                             lr_step=None):
     optimizer = SGD(parameters, lr=lr, momentum=momentum, weight_decay=weight_decay,
                     nesterov=True if nesterov and momentum else False)
+#     optimizer = torch.optim.Adam(parameters, eps=0.01, weight_decay=weight_decay) # FIXME: Optimizer is different
     if epochs == 0:
         scheduler = None
     elif scheduler == 'cos':
@@ -57,7 +58,7 @@ def get_optimizer_scheduler(parameters, loader_length, epochs, lr, momentum, nes
         warm_cosine = lambda i: min((i + 1) / 100, (1 + math.cos(math.pi * i / (epochs * loader_length))) / 2)
         scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=warm_cosine)
     elif scheduler == 'step':
-        scheduler = lr_scheduler.StepLR(optimizer, lr_step * loader_length)
+        scheduler = lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
     elif scheduler == 'warmstep':
         warm_step = lambda i: min((i + 1) / 100, 1) * 0.1 ** (i // (lr_step * loader_length))
         scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=warm_step)
@@ -90,6 +91,7 @@ def main(epochs, cpu, cudnn_flag, visdom_port, visdom_freq, temp_dir, seed, no_b
     else:
         parameters.append({'params': model.parameters()})
     optimizer, scheduler = get_optimizer_scheduler(parameters=parameters, loader_length=len(loaders.train))
+    
 
     # setup partial function to simplify call
     eval_function = partial(evaluate, model=model, recall=recall_ks, query_loader=loaders.query,

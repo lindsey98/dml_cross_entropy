@@ -65,7 +65,7 @@ def resnext50():
 @model_ingredient.named_config
 def bninception():
     arch = 'bninception'
-    num_features = 1024
+    num_features = 512
 
 
 @model_ingredient.capture
