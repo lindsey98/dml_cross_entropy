@@ -23,6 +23,7 @@ ex = sacred.Experiment('Metric Learning', ingredients=[data_ingredient, model_in
 # Filter backspaces and linefeeds
 SETTINGS.CAPTURE_MODE = 'sys'
 ex.captured_out_filter = apply_backspaces_and_linefeeds
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 
 @ex.config
@@ -49,7 +50,6 @@ def get_optimizer_scheduler(parameters, loader_length, epochs, lr, momentum, nes
                             lr_step=None):
     optimizer = SGD(parameters, lr=lr, momentum=momentum, weight_decay=weight_decay,
                     nesterov=True if nesterov and momentum else False)
-#     optimizer = torch.optim.Adam(parameters, eps=0.01, weight_decay=weight_decay) # FIXME: Optimizer is different
     if epochs == 0:
         scheduler = None
     elif scheduler == 'cos':
@@ -67,10 +67,90 @@ def get_optimizer_scheduler(parameters, loader_length, epochs, lr, momentum, nes
     return optimizer, scheduler
 
 
+# @ex.automain
+# def main(epochs, cpu, cudnn_flag, visdom_port, visdom_freq, temp_dir, seed, no_bias_decay, label_smoothing):
+#     os.makedirs(temp_dir, exist_ok=True)
+#     device = torch.device('cuda:0' if torch.cuda.is_available() and not cpu else 'cpu')
+#     callback = VisdomLogger(port=visdom_port) if visdom_port else None
+#     if cudnn_flag == 'deterministic':
+#         setattr(cudnn, cudnn_flag, True)
+#
+#     torch.manual_seed(seed)
+#     loaders, recall_ks = get_loaders()
+#
+#     torch.manual_seed(seed)
+#     model = get_model(num_classes=loaders.num_classes)
+#     class_loss = SmoothCrossEntropy(epsilon=label_smoothing)
+#
+#     model.to(device)
+#     if torch.cuda.device_count() > 1:
+#         model = nn.DataParallel(model)
+#     parameters = []
+#     if no_bias_decay:
+#         parameters.append({'params': [par for par in model.parameters() if par.dim() != 1]})
+#         parameters.append({'params': [par for par in model.parameters() if par.dim() == 1], 'weight_decay': 0})
+#     else:
+#         parameters.append({'params': model.parameters()})
+#     optimizer, scheduler = get_optimizer_scheduler(parameters=parameters, loader_length=len(loaders.train))
+#
+#
+#     # setup partial function to simplify call
+#     eval_function = partial(evaluate, model=model, recall=recall_ks, query_loader=loaders.query,
+#                             gallery_loader=loaders.gallery)
+#     print(len(loaders.train.dataset))
+#     print(len(loaders.query.dataset))
+#
+#     # setup best validation logger
+#     metrics = eval_function()
+#     if callback is not None:
+#         callback.scalars(['l2', 'cosine'], 0, [metrics.recall['l2'][1], metrics.recall['cosine'][1]],
+#                          title='Val Recall@1')
+#     pprint(metrics.recall)
+#     best_val = (0, metrics.recall, deepcopy(model.state_dict()))
+#
+#     torch.manual_seed(seed)
+#     for epoch in range(epochs):
+#         if cudnn_flag == 'benchmark':
+#             setattr(cudnn, cudnn_flag, True)
+#
+#         train(model=model, labeldict=loaders.labeldict, loader=loaders.train, class_loss=class_loss, optimizer=optimizer,
+#               scheduler=scheduler, epoch=epoch, callback=callback, freq=visdom_freq, ex=ex)
+#
+#         # validation
+#         if cudnn_flag == 'benchmark':
+#             setattr(cudnn, cudnn_flag, False)
+#         metrics = eval_function()
+#         print('Validation [{:03d}]'.format(epoch)), pprint(metrics.recall)
+#         ex.log_scalar('val.recall_l2@1', metrics.recall['l2'][1], step=epoch + 1)
+#         ex.log_scalar('val.recall_cosine@1', metrics.recall['cosine'][1], step=epoch + 1)
+#
+#         if callback is not None:
+#             callback.scalars(['l2', 'cosine'], epoch + 1,
+#                              [metrics.recall['l2'][1], metrics.recall['cosine'][1]], title='Val Recall')
+#
+#         # save model dict if the chosen validation metric is better
+#         if metrics.recall['cosine'][1] >= best_val[1]['cosine'][1]:
+#             best_val = (epoch + 1, metrics.recall, deepcopy(model.state_dict()))
+#
+#     # logging
+#     ex.info['recall'] = best_val[1]
+#
+#     # saving
+#     save_name = os.path.join(temp_dir, '{}_{}.pt'.format(ex.current_run.config['model']['arch'],
+#                                                          ex.current_run.config['dataset']['name']))
+#     torch.save(state_dict_to_cpu(best_val[2]), save_name)
+#     ex.add_artifact(save_name)
+#
+#     if callback is not None:
+#         save_name = os.path.join(temp_dir, 'visdom_data.pt')
+#         callback.save(save_name)
+#         ex.add_artifact(save_name)
+#
+#     return best_val[1]['cosine'][1]
+
 @ex.automain
 def main(epochs, cpu, cudnn_flag, visdom_port, visdom_freq, temp_dir, seed, no_bias_decay, label_smoothing):
-    os.makedirs(temp_dir, exist_ok=True)
-    device = torch.device('cuda:0' if torch.cuda.is_available() and not cpu else 'cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() and not cpu else 'cpu')
     callback = VisdomLogger(port=visdom_port) if visdom_port else None
     if cudnn_flag == 'deterministic':
         setattr(cudnn, cudnn_flag, True)
@@ -92,13 +172,10 @@ def main(epochs, cpu, cudnn_flag, visdom_port, visdom_freq, temp_dir, seed, no_b
     else:
         parameters.append({'params': model.parameters()})
     optimizer, scheduler = get_optimizer_scheduler(parameters=parameters, loader_length=len(loaders.train))
-    
 
     # setup partial function to simplify call
     eval_function = partial(evaluate, model=model, recall=recall_ks, query_loader=loaders.query,
                             gallery_loader=loaders.gallery)
-    print(len(loaders.train.dataset))
-    print(len(loaders.query.dataset))
 
     # setup best validation logger
     metrics = eval_function()
@@ -113,7 +190,7 @@ def main(epochs, cpu, cudnn_flag, visdom_port, visdom_freq, temp_dir, seed, no_b
         if cudnn_flag == 'benchmark':
             setattr(cudnn, cudnn_flag, True)
 
-        train(model=model, labeldict=loaders.labeldict, loader=loaders.train, class_loss=class_loss, optimizer=optimizer,
+        train(model=model, loader=loaders.train, class_loss=class_loss, optimizer=optimizer,
               scheduler=scheduler, epoch=epoch, callback=callback, freq=visdom_freq, ex=ex)
 
         # validation

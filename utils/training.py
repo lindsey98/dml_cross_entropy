@@ -13,10 +13,8 @@ from visdom_logger import VisdomLogger
 
 from utils.metrics import AverageMeter, recall_at_ks
 
-
 def train(model: nn.Module,
           loader: DataLoader,
-          labeldict: Dict,
           class_loss: nn.Module,
           optimizer: Optimizer,
           scheduler: _LRScheduler,
@@ -33,7 +31,6 @@ def train(model: nn.Module,
 
     pbar = tqdm(loader, ncols=80, desc='Training   [{:03d}]'.format(epoch))
     for i, (batch, labels, indices) in enumerate(pbar):
-        labels = torch.tensor([labeldict[x] for x in labels.numpy()])
         batch, labels, indices = map(to_device, (batch, labels, indices))
         logits, features = model(batch)
         loss = class_loss(logits, labels).mean()
@@ -57,6 +54,52 @@ def train(model: nn.Module,
             step = epoch + i / loader_length
             ex.log_scalar('train.loss', loss, step=step)
             ex.log_scalar('train.acc', acc, step=step)
+
+
+
+# def train(model: nn.Module,
+#           loader: DataLoader,
+#           labeldict: Dict,
+#           class_loss: nn.Module,
+#           optimizer: Optimizer,
+#           scheduler: _LRScheduler,
+#           epoch: int,
+#           callback: VisdomLogger,
+#           freq: int,
+#           ex: Experiment = None) -> None:
+#     model.train()
+#     device = next(model.parameters()).device
+#     to_device = lambda x: x.to(device, non_blocking=True)
+#     loader_length = len(loader)
+#     train_losses = AverageMeter(device=device, length=loader_length)
+#     train_accs = AverageMeter(device=device, length=loader_length)
+#
+#     pbar = tqdm(loader, ncols=80, desc='Training   [{:03d}]'.format(epoch))
+#     for i, (batch, labels, indices) in enumerate(pbar):
+#         labels = torch.tensor([labeldict[x] for x in labels.numpy()])
+#         batch, labels, indices = map(to_device, (batch, labels, indices))
+#         logits, features = model(batch)
+#         loss = class_loss(logits, labels).mean()
+#         acc = (logits.detach().argmax(1) == labels).float().mean()
+#
+#         optimizer.zero_grad()
+#         loss.backward()
+#         optimizer.step()
+#         scheduler.step()
+#
+#         train_losses.append(loss)
+#         train_accs.append(acc)
+#
+#         if callback is not None and not (i + 1) % freq:
+#             step = epoch + i / loader_length
+#             callback.scalar('xent', step, train_losses.last_avg, title='Train Losses')
+#             callback.scalar('train_acc', step, train_accs.last_avg, title='Train Acc')
+#
+#     if ex is not None:
+#         for i, (loss, acc) in enumerate(zip(train_losses.values_list, train_accs.values_list)):
+#             step = epoch + i / loader_length
+#             ex.log_scalar('train.loss', loss, step=step)
+#             ex.log_scalar('train.acc', acc, step=step)
 
 
 class _Metrics(NamedTuple):

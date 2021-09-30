@@ -45,6 +45,8 @@ class AverageMeter:
             return self.latest_avg
 
 
+
+
 @torch.no_grad()
 def recall_at_ks(query_features: torch.Tensor,
                  query_labels: torch.LongTensor,
@@ -91,13 +93,19 @@ def recall_at_ks(query_features: torch.Tensor,
     to_cpu_numpy = lambda x: x.cpu().numpy()
     q_f, q_l, g_f, g_l = map(to_cpu_numpy, [query_features, query_labels, gallery_features, gallery_labels])
 
-    res = faiss.StandardGpuResources()
-    flat_config = faiss.GpuIndexFlatConfig()
-    flat_config.device = 0
+    if hasattr(faiss, 'StandardGpuResources'):
+        res = faiss.StandardGpuResources()
+        flat_config = faiss.GpuIndexFlatConfig()
+        flat_config.device = 0
 
-    max_k = max(ks)
-    index_function = faiss.GpuIndexFlatIP if cosine else faiss.GpuIndexFlatL2
-    index = index_function(res, g_f.shape[1], flat_config)
+        max_k = max(ks)
+        index_function = faiss.GpuIndexFlatIP if cosine else faiss.GpuIndexFlatL2
+        index = index_function(res, g_f.shape[1], flat_config)
+    else:
+        max_k = max(ks)
+        index_function = faiss.IndexFlatIP if cosine else faiss.IndexFlatL2
+        index = index_function(g_f.shape[1])
+
     index.add(g_f)
     closest_indices = index.search(q_f, max_k + offset)[1]
 
@@ -117,7 +125,7 @@ def recall_at_ks_full(query_features: torch.Tensor,
                  cosine: bool = False,
                  threshold: Optional[float] = None) -> Dict[int, float]:
     """
-    Compute the full recall, precision list between samples at each k. 
+    Compute the full recall, precision list between samples at each k.
 
     Parameters
     ----------
@@ -161,17 +169,17 @@ def recall_at_ks_full(query_features: torch.Tensor,
     res = faiss.StandardGpuResources()
     flat_config = faiss.GpuIndexFlatConfig()
     flat_config.device = 0
-    
-    # compute R for R-precision 
+
+    # compute R for R-precision
 #     if gallery_features is None:
 #         R = (q_l[:, None] == g_l).sum(1) - 1 # R is how many in gallery have the same class as query (exclude itself)
 #     else:
-#         R = (q_l[:, None] == g_l).sum(1) # R is how many in gallery have the same class as query 
-             
-    # for ease of calculation (compute precision as a batch) lets take R to be minimum among all R 
+#         R = (q_l[:, None] == g_l).sum(1) # R is how many in gallery have the same class as query
+
+    # for ease of calculation (compute precision as a batch) lets take R to be minimum among all R
 #     R = R.min()
 #     print('Selected R {}'.format(R))
-             
+
     # perform similarity search
 #     max_k = max(max(ks), R)
 
@@ -180,8 +188,8 @@ def recall_at_ks_full(query_features: torch.Tensor,
     index = index_function(res, g_f.shape[1], flat_config)
     index.add(g_f)
     distances, closest_indices = index.search(q_f, max_k + offset)
-    
-             
+
+
     recalls = {}
     precisions = {}
     for k in ks:
@@ -189,13 +197,13 @@ def recall_at_ks_full(query_features: torch.Tensor,
         # Recall @ k
         recalls[k] = ((q_l[:, None] == g_l[indices]) * (distances[:, offset:k + offset] >= threshold)).any(1)
         # R-precision
-#         indices_nnr = closest_indices[:, offset:R + offset]     
+#         indices_nnr = closest_indices[:, offset:R + offset]
 #         precisions[k] = ((q_l[:, None] == g_l[indices_nnr]) * (distances[:, offset:R + offset] > threshold)).sum(1) / R
         # precision matched/same class
 
         precisions[k] = ((q_l[:, None] == g_l[indices]) * (distances[:, offset:k + offset] >= threshold)).sum(1) / \
                         ((distances[:, offset:k + offset] >= threshold).sum(1) + 1e-4)
-        
+
     return recalls, precisions
 
 
@@ -258,12 +266,12 @@ def fp_fn_eval(query_features: torch.Tensor,
     index = index_function(res, g_f.shape[1], flat_config)
     index.add(g_f)
     distances, closest_indices = index.search(q_f, max_k + offset)
-    
+
     indices = closest_indices[:, offset:max_k + offset]
     # fns
     fns = ((distances[:, offset:max_k + offset] < threshold)).any(1)  # 1st neighbor is far --> FN
     fps = ((q_l[:, None] != g_l[indices]) * (distances[:, offset:max_k + offset] >= threshold)).any(1) # 1st neighbor is close but not having the same class label
-         
+
     return fns, fps
 
 

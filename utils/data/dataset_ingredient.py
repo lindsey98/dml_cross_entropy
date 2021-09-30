@@ -63,6 +63,7 @@ def logo2k():
     resize = (256, 256)
     ratio = (1., 1.)
 
+
 @data_ingredient.named_config
 def sop():
     name = 'sop'
@@ -125,18 +126,20 @@ def inshop_vae():
     resize = (64, 64)
     crop_size = 64
     data_path = 'data/InShop'
-    
+
+
 @data_ingredient.named_config
-def logo2k():
-    name = 'inshop'
-    data_path = 'data/logo2k-data'
+def logo2k_super100():
+    name = 'logo2k_super100'
+    train_file = 'train.txt'
+    test_file = 'test.txt'
+    data_path = 'data/logo2k_super100'
     resize = (256, 256)
 
 def RGB2BGR(im):
     assert im.mode == 'RGB'
     r, g, b = im.split()
     return Image.merge('RGB', (b, g, r))
-
 
 @data_ingredient.capture
 def get_transforms(crop_size, scale, ratio, resize=None, rotate=None, color_jitter=None):
@@ -154,7 +157,7 @@ def get_transforms(crop_size, scale, ratio, resize=None, rotate=None, color_jitt
 
     test_transform.extend([transforms.CenterCrop(size=crop_size),
                            transforms.ToTensor()])
-    
+
     return transforms.Compose(train_transform), transforms.Compose(test_transform)
 
 
@@ -165,16 +168,14 @@ def read_file(filename):
 
 
 @data_ingredient.capture
-def get_sets(name, data_path, train_file, test_file, pool_file, preload, num_workers):
+def get_sets(name, data_path, train_file, test_file, preload, num_workers):
     train_transform, test_transform = get_transforms()
 
     train_lines = read_file(os.path.join(data_path, train_file))
     train_samples = [(os.path.join(data_path, line.split(',')[0]), int(line.split(',')[1])) for line in train_lines]
-    known_classes = [int(line.split(',')[1]) for line in train_lines]
     train_set = ImageDataset(train_samples, transform=train_transform, preload=preload, num_workers=num_workers)
 
     if isinstance(test_file, list) and len(test_file) == 2:
-        # test set and gallery set
         query_lines = read_file(os.path.join(data_path, test_file[0]))
         gallery_lines = read_file(os.path.join(data_path, test_file[1]))
         query_samples = [(os.path.join(data_path, line.split(',')[0]), int(line.split(',')[1])) for line in query_lines]
@@ -183,41 +184,25 @@ def get_sets(name, data_path, train_file, test_file, pool_file, preload, num_wor
         query_set = ImageDataset(query_samples, transform=test_transform, preload=preload, num_workers=num_workers)
         gallery_set = ImageDataset(gallery_samples, transform=test_transform, preload=preload, num_workers=num_workers)
     else:
-        # test set and gallery set are the same
         query_lines = read_file(os.path.join(data_path, test_file))
         query_samples = [(os.path.join(data_path, line.split(',')[0]), int(line.split(',')[1])) for line in query_lines]
         query_set = ImageDataset(query_samples, transform=test_transform, preload=preload, num_workers=num_workers)
         gallery_set = None
-        
-    # test set which only includes novel classes
-    query_novel_samples = [(os.path.join(data_path, line.split(',')[0]), int(line.split(',')[1])) \
-                               for line in query_lines if int(line.split(',')[1]) not in known_classes]  
-    query_novel_set = ImageDataset(query_novel_samples, transform=test_transform, 
-                                   preload=preload, num_workers=num_workers)
-        
-    # pool set
-    pool_lines = read_file(os.path.join(data_path, pool_file))
-    pool_samples = [(os.path.join(data_path, line.split(',')[0]), int(line.split(',')[1])) for line in pool_lines]
-    pool_set = ImageDataset(pool_samples, transform=test_transform, preload=preload, num_workers=num_workers)
 
-    return train_set, (query_set, gallery_set, pool_set, query_novel_set)
+    return train_set, (query_set, gallery_set)
 
 
 class MetricLoaders(NamedTuple):
     train: DataLoader
     num_classes: int
     query: DataLoader
-    query_novel: DataLoader
-    pool: DataLoader
-    train_noshuffle: DataLoader
-    labeldict: Dict
     gallery: Optional[DataLoader] = None
 
 
 @data_ingredient.capture
 def get_loaders(batch_size, test_batch_size, num_workers, pin_memory, sampler, recalls,
                 num_iterations=None, num_identities=None):
-    train_set, (query_set, gallery_set, pool_set, query_novel_set) = get_sets()
+    train_set, (query_set, gallery_set) = get_sets()
 
     if sampler == 'random':
         train_sampler = BatchSampler(RandomSampler(train_set), batch_size=batch_size, drop_last=True)
@@ -226,40 +211,11 @@ def get_loaders(batch_size, test_batch_size, num_workers, pin_memory, sampler, r
     else:
         raise ValueError('Invalid choice of sampler ({}).'.format(sampler))
     train_loader = DataLoader(train_set, batch_sampler=train_sampler, num_workers=num_workers, pin_memory=pin_memory)
-    train_noshuffle = DataLoader(train_set, batch_size=test_batch_size,num_workers=num_workers, pin_memory=pin_memory)
     query_loader = DataLoader(query_set, batch_size=test_batch_size, num_workers=num_workers, pin_memory=pin_memory)
     gallery_loader = None
     if gallery_set is not None:
         gallery_loader = DataLoader(gallery_set, batch_size=test_batch_size, num_workers=num_workers,
                                     pin_memory=pin_memory)
-        
-    query_novel_loader = DataLoader(query_novel_set, batch_size=test_batch_size, 
-                                    num_workers=num_workers, pin_memory=pin_memory)
-    
-    # label is not continuous, need this dictionary to map it to continuous integer
-    labeldict = {}
-    i = 0
-    for label in set(train_set.targets):
-        if int(label) not in labeldict.keys():
-            labeldict[int(label)] = i
-            i += 1
-            
-    for label in set(pool_set.targets):
-        if int(label) not in labeldict.keys():
-            labeldict[int(label)] = i
-            i += 1
-            
-    for label in set(query_set.targets):
-        if int(label) not in labeldict.keys():
-            labeldict[int(label)] = i
-            i += 1
 
-    print(labeldict)
-            
-    pool_loader = DataLoader(pool_set, batch_size=test_batch_size, num_workers=num_workers, pin_memory=pin_memory)
-    return MetricLoaders(train=train_loader, query=query_loader, pool=pool_loader, gallery=gallery_loader, 
-                         train_noshuffle = train_noshuffle,
-                         num_classes=len(set(train_set.targets)),
-                         labeldict=labeldict,
-                         query_novel=query_novel_loader), recalls
-
+    return MetricLoaders(train=train_loader, query=query_loader, gallery=gallery_loader,
+                         num_classes=max(train_set.targets) + 1), recalls
