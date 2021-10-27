@@ -206,29 +206,29 @@ def generate_inshop_train_test(inshop_dir, train_file, test_query_file, test_gal
     with open(test_gallery_file, 'w') as f:
         f.write('\n'.join(test_gallery))
 
-ex5 = Experiment('Prepare Logo2k super100')
+ex5 = Experiment('Prepare Logo2k')
 
 
 @ex5.config
 def config():
-    logo2k_super100_dir = path.join('data', 'logo2k_super100')
+    logo2k_dir = path.join('/home/ruofan/PycharmProjects/SoftTriple/datasets', 'logo2k')
     train_file = 'train.txt'
     test_file = 'test.txt'
 
 @ex5.main
-def generate_logo2ksuper100_train_test(logo2k_super100_dir, train_file, test_file):
-    train_file = path.join(logo2k_super100_dir, train_file)
-    test_file = path.join(logo2k_super100_dir, test_file)
+def generate_logo2k(logo2k_dir, train_file, test_file):
+    train_file = path.join(logo2k_dir, train_file)
+    test_file = path.join(logo2k_dir, test_file)
     train = []
     test = []
 
-    for label in os.listdir(os.path.join(logo2k_super100_dir, 'train')):
-        for file in os.listdir(os.path.join(logo2k_super100_dir, 'train', label)):
+    for label in os.listdir(os.path.join(logo2k_dir, 'train')):
+        for file in os.listdir(os.path.join(logo2k_dir, 'train', label)):
             file_line = ','.join((os.path.join('train', label, file), str(label)))
             train.append(file_line)
 
-    for label in os.listdir(os.path.join(logo2k_super100_dir, 'test')):
-        for file in os.listdir(os.path.join(logo2k_super100_dir, 'test', label)):
+    for label in os.listdir(os.path.join(logo2k_dir, 'test')):
+        for file in os.listdir(os.path.join(logo2k_dir, 'test', label)):
             file_line = ','.join((os.path.join('test', label, file), str(label)))
             test.append(file_line)
 

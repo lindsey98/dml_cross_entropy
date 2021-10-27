@@ -7,7 +7,7 @@ model_ingredient = Ingredient('model')
 
 @model_ingredient.config
 def config():
-    arch = 'resnet18'
+    arch = 'resnet50'
     pretrained = True  # use a pretrained model from torchvision
     num_features = 512  # dimensionality of the features produced by the feature extractor
     dropout = 0.
@@ -52,7 +52,7 @@ def resnet34():
 @model_ingredient.named_config
 def resnet50():
     arch = 'resnet50'
-    num_features = 2048
+    num_features = 512
     dropout = 0.5
 
 

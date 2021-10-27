@@ -35,30 +35,30 @@ def config():
 
 @data_ingredient.named_config
 def cub():
-    name = 'cub'
-    data_path = 'data/CUB_200_2011'
-    train_file = 'train_small.txt'
-    test_file = 'test_new.txt'    
+    name = 'cub_512'
+    data_path = '/home/ruofan/PycharmProjects/ProxyNCA-/mnt/datasets/CUB_200_2011'
+    train_file = 'train.txt'
+    test_file = 'test.txt'
     resize = 256
     color_jitter = (0.25, 0.25, 0.25, 0)
 
 
 @data_ingredient.named_config
 def cars():
-    name = 'cars'
-    train_file = 'train_small.txt'
-    test_file = 'test_new.txt'  
-    data_path = 'data/CARS_196'
+    name = 'cars_512'
+    data_path = '/home/ruofan/PycharmProjects/ProxyNCA-/mnt/datasets/CARS_196'
+    train_file = 'train.txt'
+    test_file = 'test.txt'
     resize = (256, 256)
     color_jitter = (0.3, 0.3, 0.3, 0.1)
     ratio = (1., 1.)
 
 @data_ingredient.named_config
 def logo2k():
-    name = 'logo2k'
-    train_file = 'train_small.txt'
-    test_file = 'test_new.txt'  
-    data_path = 'data/logo2k-data'
+    name = 'logo2k_512'
+    data_path = '/home/ruofan/PycharmProjects/SoftTriple/datasets/logo2k'
+    train_file = 'train.txt'
+    test_file = 'test.txt'
     batch_size = 128
     resize = (256, 256)
     ratio = (1., 1.)

@@ -23,7 +23,7 @@ ex = sacred.Experiment('Metric Learning', ingredients=[data_ingredient, model_in
 # Filter backspaces and linefeeds
 SETTINGS.CAPTURE_MODE = 'sys'
 ex.captured_out_filter = apply_backspaces_and_linefeeds
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 
 @ex.config
