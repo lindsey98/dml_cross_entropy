@@ -18,7 +18,7 @@ def config():
     test_file = 'test.txt'
     pool_file = 'pool.txt'
 
-    batch_size = 128
+    batch_size = 32
     test_batch_size = 128
     sampler = 'random'
 
@@ -59,7 +59,6 @@ def logo2k():
     data_path = '/home/ruofan/PycharmProjects/SoftTriple/datasets/logo2k'
     train_file = 'train.txt'
     test_file = 'test.txt'
-    batch_size = 128
     resize = (256, 256)
     ratio = (1., 1.)
 
