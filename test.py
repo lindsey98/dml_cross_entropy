@@ -17,12 +17,12 @@ from torch.utils.data import DataLoader, RandomSampler, BatchSampler
 from torchvision import transforms
 
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
-name = 'logo2k_512'
-data_path = '/home/ruofan/PycharmProjects/SoftTriple/datasets/logo2k'
+name = 'cars_512'
+data_path = '/home/ruofan/PycharmProjects/ProxyNCA-/mnt/datasets/CARS_196'
 train_file = 'train.txt'
 test_file = 'test.txt'
-num_classes = 1171
-temp_dir = 'checkpoints/resnet50_logo2k_512.pt'
+num_classes = 98
+temp_dir = 'checkpoints/resnet50_cars_512.pt'
 
 arch = 'resnet50'
 pretrained = True  # use a pretrained model from torchvision

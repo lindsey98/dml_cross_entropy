@@ -78,8 +78,13 @@ def calc_nmi(X, T, nb_classes):
 def mapr(X, T):
     # MAP@R
     label_counts = get_label_match_counts(T, T) # get R
-    num_k = determine_k(num_reference_embeddings=len(T), embeddings_come_from_same_source=True) # equal to num_reference-1 (deduct itself)
-    knn_indices, knn_distances = get_knn(
+    # num_k = determine_k(num_reference_embeddings=len(T), embeddings_come_from_same_source=True) # equal to num_reference-1 (deduct itself)
+    # num_k = determine_k(
+    #     num_reference_embeddings=len(T), embeddings_come_from_same_source=True
+    # ) # equal to num_reference-1 (deduct itself)
+
+    num_k = max([count[1] for count in label_counts])
+    knn_indices = get_knn(
         X, X, num_k, True
     )
     knn_labels = T[knn_indices] # get KNN indicies
@@ -96,10 +101,11 @@ def mapr(X, T):
 def mapr_inshop(X_query, T_query, X_gallery, T_gallery):
     # MAP@R
     label_counts = get_label_match_counts(T_query, T_gallery)  # get R
-    num_k = determine_k(
-        num_reference_embeddings=len(T_gallery), embeddings_come_from_same_source=False
-    )  # equal to num_reference
-    knn_indices, knn_distances = get_knn(
+    # num_k = determine_k(
+    #     num_reference_embeddings=len(T_gallery), embeddings_come_from_same_source=False
+    # )  # equal to num_reference
+    num_k = max([count[1] for count in label_counts])
+    knn_indices = get_knn(
         X_gallery, X_query, num_k, True
     )
     knn_labels = T_gallery[knn_indices]  # get KNN indicies
@@ -119,7 +125,7 @@ def recall_at_ks(query_features: torch.Tensor,
                  ks: List[int],
                  gallery_features: Optional[torch.Tensor] = None,
                  gallery_labels: Optional[torch.Tensor] = None,
-                 cosine: bool = False) -> Dict[int, float]:
+                 cosine: bool = True) -> Dict[int, float]:
     """
     Compute the recall between samples at each k. This function uses about 8GB of memory.
 
@@ -163,7 +169,6 @@ def recall_at_ks(query_features: torch.Tensor,
         res = faiss.StandardGpuResources()
         flat_config = faiss.GpuIndexFlatConfig()
         flat_config.device = 0
-
         max_k = max(ks)
         index_function = faiss.GpuIndexFlatIP if cosine else faiss.GpuIndexFlatL2
         index = index_function(res, g_f.shape[1], flat_config)
