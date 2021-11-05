@@ -1,9 +1,12 @@
 from typing import Dict, List, Optional
 
 import faiss
+import numpy as np
 import torch
 import torch.nn.functional as F
-
+import sklearn.cluster
+import sklearn.metrics.cluster
+from utils.map import *
 
 class AverageMeter:
     """Computes and stores the average and current value on device"""
@@ -45,6 +48,69 @@ class AverageMeter:
             return self.latest_avg
 
 
+def cluster_by_kmeans(X, nb_clusters):
+    """
+    xs : embeddings with shape [nb_samples, nb_features]
+    nb_clusters : in this case, must be equal to number of classes
+    """
+    # return sklearn.cluster.MiniBatchKMeans(nb_clusters, batch_size=32).fit(X).labels_
+    X = X.detach().cpu().numpy()
+    kmeans = faiss.Kmeans(d=X.shape[1], k=nb_clusters)
+    kmeans.train(X.astype(np.float32))
+    labels = kmeans.index.search(X.astype(np.float32), 1)[1]
+    return np.squeeze(labels, 1)
+
+def calc_normalized_mutual_information(ys, xs_clustered):
+    return sklearn.metrics.cluster.normalized_mutual_info_score(xs_clustered, ys, average_method='geometric')
+
+
+def calc_nmi(X, T, nb_classes):
+    # calculate NMI with kmeans clustering
+    nmi = calc_normalized_mutual_information(
+        T,
+        cluster_by_kmeans(
+            X, nb_classes
+        )
+    )
+    print(nmi)
+    return nmi
+
+def mapr(X, T):
+    # MAP@R
+    label_counts = get_label_match_counts(T, T) # get R
+    num_k = determine_k(num_reference_embeddings=len(T), embeddings_come_from_same_source=True) # equal to num_reference-1 (deduct itself)
+    knn_indices, knn_distances = get_knn(
+        X, X, num_k, True
+    )
+    knn_labels = T[knn_indices] # get KNN indicies
+    map_R = mean_average_precision_at_r(knn_labels=knn_labels,
+                                        gt_labels=T[:, None],
+                                        embeddings_come_from_same_source=True,
+                                        label_counts=label_counts,
+                                        avg_of_avgs=False,
+                                        label_comparison_fn=torch.eq)
+    logging.info("MAP@R:{:.3f}".format(map_R * 100))
+    return map_R
+
+
+def mapr_inshop(X_query, T_query, X_gallery, T_gallery):
+    # MAP@R
+    label_counts = get_label_match_counts(T_query, T_gallery)  # get R
+    num_k = determine_k(
+        num_reference_embeddings=len(T_gallery), embeddings_come_from_same_source=False
+    )  # equal to num_reference
+    knn_indices, knn_distances = get_knn(
+        X_gallery, X_query, num_k, True
+    )
+    knn_labels = T_gallery[knn_indices]  # get KNN indicies
+    map_R = mean_average_precision_at_r(knn_labels=knn_labels,
+                                        gt_labels=T_query[:, None],
+                                        embeddings_come_from_same_source=False,
+                                        label_counts=label_counts,
+                                        avg_of_avgs=False,
+                                        label_comparison_fn=torch.eq)
+    logging.info("MAP@R:{:.3f}".format(map_R * 100))
+    return map_R
 
 
 @torch.no_grad()
@@ -113,6 +179,7 @@ def recall_at_ks(query_features: torch.Tensor,
     for k in ks:
         indices = closest_indices[:, offset:k + offset]
         recalls[k] = (q_l[:, None] == g_l[indices]).any(1).mean()
+    print(recalls)
     return {k: round(v * 100, 2) for k, v in recalls.items()}
 
 
@@ -170,19 +237,6 @@ def recall_at_ks_full(query_features: torch.Tensor,
     flat_config = faiss.GpuIndexFlatConfig()
     flat_config.device = 0
 
-    # compute R for R-precision
-#     if gallery_features is None:
-#         R = (q_l[:, None] == g_l).sum(1) - 1 # R is how many in gallery have the same class as query (exclude itself)
-#     else:
-#         R = (q_l[:, None] == g_l).sum(1) # R is how many in gallery have the same class as query
-
-    # for ease of calculation (compute precision as a batch) lets take R to be minimum among all R
-#     R = R.min()
-#     print('Selected R {}'.format(R))
-
-    # perform similarity search
-#     max_k = max(max(ks), R)
-
     max_k = max(ks)
     index_function = faiss.GpuIndexFlatIP if cosine else faiss.GpuIndexFlatL2
     index = index_function(res, g_f.shape[1], flat_config)
@@ -196,11 +250,6 @@ def recall_at_ks_full(query_features: torch.Tensor,
         indices = closest_indices[:, offset:k + offset]
         # Recall @ k
         recalls[k] = ((q_l[:, None] == g_l[indices]) * (distances[:, offset:k + offset] >= threshold)).any(1)
-        # R-precision
-#         indices_nnr = closest_indices[:, offset:R + offset]
-#         precisions[k] = ((q_l[:, None] == g_l[indices_nnr]) * (distances[:, offset:R + offset] > threshold)).sum(1) / R
-        # precision matched/same class
-
         precisions[k] = ((q_l[:, None] == g_l[indices]) * (distances[:, offset:k + offset] >= threshold)).sum(1) / \
                         ((distances[:, offset:k + offset] >= threshold).sum(1) + 1e-4)
 

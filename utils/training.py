@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from visdom_logger import VisdomLogger
 
-from utils.metrics import AverageMeter, recall_at_ks
+from utils.metrics import AverageMeter, recall_at_ks, calc_nmi, mapr, mapr_inshop
 
 def train(model: nn.Module,
           loader: DataLoader,
@@ -106,6 +106,8 @@ class _Metrics(NamedTuple):
     loss: float
     accuracy: float
     recall: Dict[str, Dict[int, float]]
+    nmi: float
+    mapr: float
 
 
 def evaluate(model: nn.Module,
@@ -160,7 +162,19 @@ def evaluate(model: nn.Module,
         if xent:
             xent_losses = torch.cat(xent_losses, 0)
             loss = xent_losses.mean().item()
-        all_predictions = torch.cat(all_predictions, 0)
-        acc = (all_predictions == all_query_labels).float().mean().item()
 
-    return _Metrics(loss=loss if xent else None, accuracy=acc, recall=recalls if recall is not None else None)
+        all_query_features = all_query_features.detach().cpu()
+        all_query_labels = all_query_labels.detach().cpu()
+
+        if all_gallery_features is not None:
+            all_gallery_features = all_gallery_features.detach().cpu()
+            all_gallery_labels = all_gallery_labels.detach().cpu()
+
+        nmi = calc_nmi(all_query_features, all_query_labels, len(set(query_loader.dataset.targets)))
+        map_r = mapr(all_query_features, all_query_labels, )
+
+        all_predictions = torch.cat(all_predictions, 0)
+        acc = (all_predictions.detach().cpu() == all_query_labels.detach().cpu()).float().mean().item()
+
+    return _Metrics(loss=loss if xent else None, accuracy=acc, recall=recalls if recall is not None else None,
+                    nmi=nmi, mapr=map_r)
